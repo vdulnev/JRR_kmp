@@ -1,49 +1,74 @@
 package com.example.jrr
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import jrr.composeapp.generated.resources.Res
-import jrr.composeapp.generated.resources.compose_multiplatform
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.jrr.data.local.JRiverSettings
+import com.example.jrr.data.remote.lookup.JRiverLookupService
+import com.example.jrr.data.remote.mcws.JRiverMcwsClient
+import com.example.jrr.data.remote.mcws.McwsApi
+import com.example.jrr.service.JRiverService
+import com.example.jrr.ui.player.NowPlayingScreen
+import com.example.jrr.ui.player.PlayerViewModel
+import com.example.jrr.ui.setup.SetupScreen
+import com.example.jrr.ui.setup.SetupViewModel
+import com.example.jrr.ui.theme.ObsidianTheme
+import io.ktor.client.*
+import nl.adaptivity.xmlutil.serialization.XML
 
 @Composable
-@Preview
-fun App() {
-    MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+fun App(dataStore: DataStore<Preferences>) {
+    val httpClient = remember { HttpClient() }
+    val xml = remember { XML { autoPolymorphic = true } }
+    val settings = remember { JRiverSettings(dataStore) }
+    val lookupService = remember { JRiverLookupService(httpClient, xml) }
+    val mcwsClient = remember { JRiverMcwsClient(httpClient, McwsApi(httpClient), xml) }
+    val jRiverService = remember { JRiverService(mcwsClient) }
+
+    val serverAddress by settings.serverAddress.collectAsState(null)
+    val authToken by settings.authToken.collectAsState(null)
+
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Setup) }
+
+    LaunchedEffect(serverAddress, authToken) {
+        if (serverAddress != null) {
+            mcwsClient.updateConfig(serverAddress!!, authToken)
+            jRiverService.start()
+            currentScreen = Screen.Player
+        } else {
+            currentScreen = Screen.Setup
+        }
+    }
+
+    ObsidianTheme {
+        when (val screen = currentScreen) {
+            Screen.Setup -> {
+                val setupViewModel: SetupViewModel = viewModel {
+                    SetupViewModel(lookupService, mcwsClient, settings)
                 }
+                SetupScreen(
+                    viewModel = setupViewModel,
+                    onSuccess = {
+                        // Navigation handled by LaunchedEffect observing settings
+                    }
+                )
+            }
+            Screen.Player -> {
+                val playerViewModel: PlayerViewModel = viewModel {
+                    PlayerViewModel(jRiverService)
+                }
+                NowPlayingScreen(
+                    viewModel = playerViewModel,
+                    serverAddress = serverAddress ?: ""
+                )
             }
         }
     }
+}
+
+sealed class Screen {
+    object Setup : Screen()
+    object Player : Screen()
 }

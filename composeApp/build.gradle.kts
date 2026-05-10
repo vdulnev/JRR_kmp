@@ -34,7 +34,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.logback.classic)
+            implementation(libs.slf4j.android)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

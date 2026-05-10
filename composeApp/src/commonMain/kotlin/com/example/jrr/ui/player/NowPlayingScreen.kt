@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.example.jrr.domain.model.PlaybackState
+import com.example.jrr.ui.component.ObsidianVolumeSlider
 import com.example.jrr.ui.component.TechnicalLabel
 
 @Composable
@@ -79,14 +80,31 @@ fun NowPlayingScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
-        Text(
-            text = status?.trackInfo?.album ?: "",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Technical Info
+        if (status?.trackInfo != null) {
+            TechnicalLabel(
+                text = "${status.trackInfo.bitrate} kbps | ${status.trackInfo.sampleRate / 1000.0} kHz | ${status.trackInfo.bitDepth} bit",
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+            )
+        }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // Volume Slider
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.VolumeDown, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+            ObsidianVolumeSlider(
+                value = status?.volume ?: 0f,
+                onValueChange = { viewModel.setVolume(it) },
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+            )
+            Icon(Icons.Default.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Progress Bar (Simple version)
         val progress = if (status != null && status.durationMs > 0) {
@@ -105,7 +123,6 @@ fun NowPlayingScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(status?.positionDisplay ?: "0:00", style = MaterialTheme.typography.labelMedium)
-            // Duration display could be calculated or taken from MCWS if available
             Text(status?.playingNowPositionDisplay ?: "", style = MaterialTheme.typography.labelMedium)
         }
 

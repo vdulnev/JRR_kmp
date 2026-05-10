@@ -10,6 +10,7 @@ import com.example.jrr.data.remote.lookup.JRiverLookupService
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
 import com.example.jrr.data.remote.mcws.McwsApi
 import com.example.jrr.service.JRiverService
+import com.example.jrr.ui.player.NowPlayingContainer
 import com.example.jrr.ui.player.NowPlayingScreen
 import com.example.jrr.ui.player.PlayerViewModel
 import com.example.jrr.ui.setup.SetupScreen
@@ -59,8 +60,9 @@ fun App(dataStore: DataStore<Preferences>) {
                 val playerViewModel: PlayerViewModel = viewModel {
                     PlayerViewModel(jRiverService)
                 }
-                NowPlayingScreen(
+                NowPlayingContainer(
                     viewModel = playerViewModel,
+                    jRiverService = jRiverService,
                     serverAddress = serverAddress ?: ""
                 )
             }

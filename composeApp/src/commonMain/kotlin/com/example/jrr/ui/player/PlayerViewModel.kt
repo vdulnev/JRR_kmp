@@ -36,6 +36,16 @@ class PlayerViewModel(
     fun next() = jRiverService.next()
     fun previous() = jRiverService.previous()
     
+    fun setVolume(level: Float) = jRiverService.setVolume(level)
+    fun seek(positionMs: Int) = jRiverService.seek(positionMs)
+
+    fun setQueuePosition(index: Int) = jRiverService.setQueuePosition(index)
+    fun reorderQueue(from: Int, to: Int) = jRiverService.reorderQueue(from, to)
+    fun removeFromQueue(index: Int) = jRiverService.removeFromQueue(index)
+
+    fun linkZones(targetZoneIds: List<String>) = jRiverService.linkZones(targetZoneIds)
+    fun unlinkZone(zoneId: String) = jRiverService.unlinkZone(zoneId)
+
     fun selectZone(zoneId: String) {
         jRiverService.setActiveZone(zoneId)
     }

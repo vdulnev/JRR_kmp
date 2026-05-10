@@ -22,6 +22,7 @@ coil = "3.0.4"
 material-icons = "1.7.8"
 material3 = "1.10.0-alpha05"
 logback = "1.5.16"
+slf4j-android = "2.0.17-0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -71,6 +72,7 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.re
 
 # Logging
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+slf4j-android = { module = "uk.uuid.slf4j:slf4j-android", version.ref = "slf4j-android" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

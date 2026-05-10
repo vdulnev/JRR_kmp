@@ -24,6 +24,7 @@ class JRiverService(
     private var zonesPollingJob: Job? = null
 
     fun start() {
+        println("JRiverService: Starting service")
         startPlaybackPolling()
         startZonesPolling()
     }
@@ -34,6 +35,7 @@ class JRiverService(
     }
 
     fun setActiveZone(zoneId: String) {
+        println("JRiverService: Setting active zone to $zoneId")
         activeZoneId = zoneId
         // Trigger immediate poll
         scope.launch { pollPlaybackInfo() }
@@ -70,12 +72,13 @@ class JRiverService(
             onSuccess = { status ->
                 _playerStatus.value = status
                 if (status.playingNowChangeCounter != lastChangeCounter) {
+                    println("JRiverService: Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks in server info: ${status.playingNowTracks}. Fetching queue.")
                     lastChangeCounter = status.playingNowChangeCounter
                     fetchQueue(status.zoneId)
                 }
             },
             onFailure = {
-                // Log or handle error
+                println("JRiverService: Failed to poll playback info: ${it.message}")
             }
         )
     }
@@ -85,17 +88,27 @@ class JRiverService(
             onSuccess = { zones ->
                 _zones.value = zones
                 if (activeZoneId == null && zones.isNotEmpty()) {
+                    println("JRiverService: No active zone, selecting first: ${zones.first().name}")
                     setActiveZone(zones.first().id)
                 }
             },
-            onFailure = { }
+            onFailure = { 
+                println("JRiverService: Failed to poll zones: ${it.message}")
+            }
         )
     }
 
     private suspend fun fetchQueue(zoneId: String) {
+        println("JRiverService: Fetching queue for zone $zoneId")
         mcwsClient.getPlayingNow(zoneId).fold(
-            onSuccess = { _currentQueue.value = it },
-            onFailure = { }
+            onSuccess = { 
+                println("JRiverService: Successfully fetched queue (${it.size} items)")
+                _currentQueue.value = it 
+            },
+            onFailure = { 
+                println("JRiverService: Failed to fetch queue: ${it.message}")
+                it.printStackTrace()
+            }
         )
     }
 
@@ -105,4 +118,27 @@ class JRiverService(
     fun playPause() = scope.launch { activeZoneId?.let { mcwsClient.playPause(it) } }
     fun next() = scope.launch { activeZoneId?.let { mcwsClient.next(it) } }
     fun previous() = scope.launch { activeZoneId?.let { mcwsClient.previous(it) } }
+
+    fun setVolume(level: Float) = scope.launch { activeZoneId?.let { mcwsClient.setVolume(it, level) } }
+    fun seek(positionMs: Int) = scope.launch { activeZoneId?.let { mcwsClient.seek(it, positionMs) } }
+
+    fun setQueuePosition(index: Int) = scope.launch { activeZoneId?.let { mcwsClient.setQueuePosition(it, index) } }
+    fun reorderQueue(from: Int, to: Int) = scope.launch { activeZoneId?.let { mcwsClient.reorderQueue(it, from, to) } }
+    fun removeFromQueue(index: Int) = scope.launch { activeZoneId?.let { mcwsClient.removeFromQueue(it, index) } }
+
+    fun linkZones(targetZoneIds: List<String>) = scope.launch { activeZoneId?.let { mcwsClient.linkZones(it, targetZoneIds) } }
+    fun unlinkZone(zoneId: String) = scope.launch { mcwsClient.unlinkZone(zoneId) }
+
+    // Library Operations
+    suspend fun browseChildren(id: String = "-1"): List<BrowseItem> {
+        return mcwsClient.browseChildren(id).getOrDefault(emptyList())
+    }
+
+    suspend fun browseFiles(id: String): List<Track> {
+        return mcwsClient.browseFiles(id).getOrDefault(emptyList())
+    }
+
+    suspend fun search(query: String, limit: Int = -1): List<Track> {
+        return mcwsClient.searchFiles(query, limit = limit).getOrDefault(emptyList())
+    }
 }

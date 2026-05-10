@@ -11,7 +11,14 @@ data class McwsResponse(
     val status: String,
     val items: List<McwsItem> = emptyList()
 ) {
-    fun toMap(): Map<String, String> = items.associate { it.name to it.value }
+    fun toMap(): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        items.forEach { 
+            // Store with original case but we'll use a case-insensitive accessor or normalize
+            map[it.name.lowercase()] = it.value 
+        }
+        return map
+    }
 }
 
 @Serializable

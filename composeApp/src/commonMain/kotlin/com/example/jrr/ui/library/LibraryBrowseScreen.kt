@@ -53,10 +53,10 @@ fun LibraryBrowseScreen(
                 }
             }
             is LibraryState.Files -> {
-                TrackList(tracks = state.tracks)
+                TrackList(tracks = state.tracks, onItemClick = { viewModel.playTrack(it) })
             }
             is LibraryState.SearchResults -> {
-                TrackList(tracks = state.tracks)
+                TrackList(tracks = state.tracks, onItemClick = { viewModel.playTrack(it) })
             }
             is LibraryState.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -100,7 +100,10 @@ fun LibraryTopBar(
 }
 
 @Composable
-fun TrackList(tracks: List<com.example.jrr.domain.model.Track>) {
+fun TrackList(
+    tracks: List<com.example.jrr.domain.model.Track>,
+    onItemClick: (com.example.jrr.domain.model.Track) -> Unit
+) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(tracks) { track ->
             ListItem(
@@ -108,7 +111,8 @@ fun TrackList(tracks: List<com.example.jrr.domain.model.Track>) {
                 supportingContent = { Text("${track.artist} — ${track.album}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingContent = { 
                     TechnicalLabel(text = track.fileType, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-                }
+                },
+                modifier = Modifier.clickable { onItemClick(track) }
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
         }

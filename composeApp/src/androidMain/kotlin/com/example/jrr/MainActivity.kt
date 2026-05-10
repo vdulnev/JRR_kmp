@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val dataStore: DataStore<Preferences> = remember { createDataStore(this) }
-            App(dataStore)
+            App(dataStore, this)
         }
     }
 }

@@ -122,6 +122,10 @@ class JRiverMcwsClient(
         api.get(baseUrl, "Playback/Previous", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
     }
 
+    suspend fun playByKey(zoneId: String, key: String): Result<Unit> = runCatching {
+        api.get(baseUrl, "Playback/PlayByKey", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Key" to key), token)
+    }
+
     suspend fun setVolume(zoneId: String, level: Float): Result<Unit> = runCatching {
         val mcwsLevel = (level * 100).toInt().coerceIn(0, 100)
         api.get(baseUrl, "Playback/Volume", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Level" to mcwsLevel.toString()), token)
@@ -307,6 +311,11 @@ class JRiverMcwsClient(
 
     suspend fun unlinkZone(zoneId: String): Result<Unit> = runCatching {
         api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+    }
+
+    // Streaming
+    fun buildStreamUrl(fileKey: String, conversion: String = "wav", quality: String = "high"): String {
+        return "$baseUrl/MCWS/v1/File/GetFile?File=$fileKey&FileType=Key&Playback=1&Conversion=$conversion&Quality=$quality&Token=$token"
     }
 
     // Library Operations

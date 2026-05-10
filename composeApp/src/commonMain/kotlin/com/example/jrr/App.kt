@@ -16,17 +16,19 @@ import com.example.jrr.ui.player.PlayerViewModel
 import com.example.jrr.ui.setup.SetupScreen
 import com.example.jrr.ui.setup.SetupViewModel
 import com.example.jrr.ui.theme.ObsidianTheme
+import com.example.jrr.player.createLocalPlayer
 import io.ktor.client.*
 import nl.adaptivity.xmlutil.serialization.XML
 
 @Composable
-fun App(dataStore: DataStore<Preferences>) {
+fun App(dataStore: DataStore<Preferences>, platformContext: Any? = null) {
     val httpClient = remember { HttpClient() }
     val xml = remember { XML { autoPolymorphic = true } }
     val settings = remember { JRiverSettings(dataStore) }
     val lookupService = remember { JRiverLookupService(httpClient, xml) }
     val mcwsClient = remember { JRiverMcwsClient(httpClient, McwsApi(httpClient), xml) }
-    val jRiverService = remember { JRiverService(mcwsClient) }
+    val localPlayer = remember { createLocalPlayer(platformContext) }
+    val jRiverService = remember { JRiverService(mcwsClient, localPlayer) }
 
     val serverAddress by settings.serverAddress.collectAsState(null)
     val authToken by settings.authToken.collectAsState(null)

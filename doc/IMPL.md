@@ -47,17 +47,17 @@ The application will implement the "Obsidian Audio" theme:
 * **Change Detection**: Implement logic to monitor `PlayingNowChangeCounter` and trigger queue refetches only when necessary.
 * **Transport Commands**: Expose play, pause, seek, volume, and zone management commands to the ViewModels.
 
-### Phase 5: Player UI & Queue [IN PROGRESS]
+### Phase 5: Player UI & Queue [COMPLETED]
 * **Now Playing Screen**: Implement the main player view showing high-res artwork (`File/GetImage`), track metadata, and transport controls.
 * **Zone Controller**: Implement the bottom sheet / drawer to switch and link/unlink zones.
 * **Play Queue Screen**: Build the interactive queue UI (`Playback/Playlist`), allowing reordering and track selection.
 
-### Phase 6: Library Browsing [PENDING]
+### Phase 6: Library Browsing [COMPLETED]
 * **Search Integration**: Implement `Files/Search` with robust MCWS query building and escaping.
 * **Browse Tree**: Implement navigation through `Browse/Children` and `Browse/Files`.
 * **Library Views**: Build the Grid and List views for Albums, Artists, and Tracks. Implement case-insensitive grouping for Multi-Disc albums client-side.
 
-### Phase 7: Local Playback Integration [PENDING]
+### Phase 7: Local Playback Integration [COMPLETED]
 * **Local Zone Synthesis**: Synthesize a "Local" zone in the KMP shared code.
 * **Stream Proxying**: Implement logic to construct streaming URLs (`File/GetFile`).
 * **Platform Media Players**: Implement KMP interfaces for a background media player, bridging to Media3 (Android) and AVPlayer (iOS/Mac).

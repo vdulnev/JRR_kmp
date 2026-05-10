@@ -84,4 +84,8 @@ class LibraryViewModel(
             _uiState.value = LibraryState.SearchResults(results, query)
         }
     }
+
+    fun playTrack(track: Track) {
+        jRiverService.playTrack(track)
+    }
 }

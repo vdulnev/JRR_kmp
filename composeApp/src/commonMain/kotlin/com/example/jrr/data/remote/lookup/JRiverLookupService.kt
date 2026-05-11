@@ -5,7 +5,9 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import nl.adaptivity.xmlutil.serialization.XML
+import org.koin.core.annotation.Single
 
+@Single
 class JRiverLookupService(
     private val httpClient: HttpClient,
     private val xml: XML

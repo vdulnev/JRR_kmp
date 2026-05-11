@@ -24,43 +24,37 @@ fun LibraryBrowseScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         LibraryTopBar(
-            title = when (val state = uiState) {
-                is LibraryState.Browsing -> state.path.lastOrNull()?.name ?: "Library"
-                is LibraryState.Files -> state.path.lastOrNull()?.name ?: "Tracks"
-                is LibraryState.SearchResults -> "Search: ${state.query}"
-                else -> "Library"
-            },
-            showBack = uiState !is LibraryState.Browsing || (uiState as LibraryState.Browsing).path.isNotEmpty(),
+            title = uiState.navigationStack.lastOrNull()?.name ?: "Library",
+            showBack = uiState.navigationStack.size > 1,
             onBack = { viewModel.navigateBack() }
         )
 
-        when (val state = uiState) {
-            is LibraryState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
-            is LibraryState.Browsing -> {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(state.items) { item ->
-                        ListItem(
-                            headlineContent = { Text(item.name) },
-                            trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
-                            modifier = Modifier.clickable { viewModel.browse(item.id, item.name) }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        } else if (uiState.error != null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(uiState.error!!, color = MaterialTheme.colorScheme.error)
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.searchQuery.isNotBlank() && uiState.searchResults.isNotEmpty()) {
+                    TechnicalLabel(text = "Search Results", modifier = Modifier.padding(16.dp))
+                    TrackList(tracks = uiState.searchResults, onItemClick = { viewModel.playTrack(it) })
+                } else if (uiState.tracks.isNotEmpty()) {
+                    TrackList(tracks = uiState.tracks, onItemClick = { viewModel.playTrack(it) })
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(uiState.children) { item ->
+                            ListItem(
+                                headlineContent = { Text(item.name) },
+                                trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
+                                modifier = Modifier.clickable { viewModel.browse(item.id, item.name) }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                     }
-                }
-            }
-            is LibraryState.Files -> {
-                TrackList(tracks = state.tracks, onItemClick = { viewModel.playTrack(it) })
-            }
-            is LibraryState.SearchResults -> {
-                TrackList(tracks = state.tracks, onItemClick = { viewModel.playTrack(it) })
-            }
-            is LibraryState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(state.message, color = MaterialTheme.colorScheme.error)
                 }
             }
         }

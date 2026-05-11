@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.jrr.domain.model.*
 import com.example.jrr.service.JRiverService
 import kotlinx.coroutines.flow.*
+import org.koin.core.annotation.KoinViewModel
 
 data class PlayerUiState(
     val status: PlayerStatus? = null,
@@ -13,6 +14,7 @@ data class PlayerUiState(
     val activeZoneId: String? = null
 )
 
+@KoinViewModel
 class PlayerViewModel(
     private val jRiverService: JRiverService
 ) : ViewModel() {

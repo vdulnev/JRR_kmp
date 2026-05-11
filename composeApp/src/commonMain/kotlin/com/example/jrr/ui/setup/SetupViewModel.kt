@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.koin.core.annotation.KoinViewModel
 
 data class SetupUiState(
     val accessKey: String = "",
@@ -23,6 +24,7 @@ data class SetupUiState(
     val isSuccess: Boolean = false
 )
 
+@KoinViewModel
 class SetupViewModel(
     private val lookupService: JRiverLookupService,
     private val mcwsClient: JRiverMcwsClient,

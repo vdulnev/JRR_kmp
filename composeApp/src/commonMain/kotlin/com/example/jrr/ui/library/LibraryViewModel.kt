@@ -9,79 +9,102 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.koin.core.annotation.KoinViewModel
 
-sealed class LibraryState {
-    data object Loading : LibraryState()
-    data class Browsing(val items: List<BrowseItem>, val path: List<BrowseItem>) : LibraryState()
-    data class Files(val tracks: List<Track>, val path: List<BrowseItem>) : LibraryState()
-    data class SearchResults(val tracks: List<Track>, val query: String) : LibraryState()
-    data class Error(val message: String) : LibraryState()
-}
+data class LibraryUiState(
+    val navigationStack: List<BrowseItem> = emptyList(),
+    val children: List<BrowseItem> = emptyList(),
+    val tracks: List<Track> = emptyList(),
+    val searchResults: List<Track> = emptyList(),
+    val searchQuery: String = "",
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
 
+@KoinViewModel
 class LibraryViewModel(
     private val jRiverService: JRiverService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<LibraryState>(LibraryState.Loading)
-    val uiState: StateFlow<LibraryState> = _uiState.asStateFlow()
-
-    private val browseStack = mutableListOf<BrowseItem>()
+    private val _uiState = MutableStateFlow(LibraryUiState())
+    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
     init {
         loadRoot()
     }
 
-    fun loadRoot() {
-        browseStack.clear()
-        browse("-1", "Library")
+    private fun loadRoot() {
+        browse("-1")
     }
 
-    fun browse(id: String, name: String) {
-        val newItem = BrowseItem(id, name)
-        if (id != "-1") browseStack.add(newItem)
-        
+    fun browse(id: String, name: String = "Library") {
         viewModelScope.launch {
-            _uiState.value = LibraryState.Loading
-            val children = jRiverService.browseChildren(id)
-            if (children.isNotEmpty()) {
-                _uiState.value = LibraryState.Browsing(children, browseStack.toList())
-            } else {
-                // If no children, try fetching files
-                val files = jRiverService.browseFiles(id)
-                _uiState.value = LibraryState.Files(files, browseStack.toList())
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                val children = jRiverService.browseChildren(id)
+                val tracks = jRiverService.browseFiles(id)
+                
+                val newStack = if (id == "-1") {
+                    listOf(BrowseItem("-1", "Library"))
+                } else {
+                    _uiState.value.navigationStack + BrowseItem(id, name)
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    navigationStack = newStack,
+                    children = children,
+                    tracks = tracks,
+                    isLoading = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
     }
 
     fun navigateBack() {
-        if (browseStack.isEmpty()) return
-        
-        browseStack.removeAt(browseStack.size - 1)
-        val parent = browseStack.lastOrNull()
-        val parentId = parent?.id ?: "-1"
-        
-        viewModelScope.launch {
-            _uiState.value = LibraryState.Loading
-            val children = jRiverService.browseChildren(parentId)
-            if (children.isNotEmpty()) {
-                _uiState.value = LibraryState.Browsing(children, browseStack.toList())
-            } else {
-                val files = jRiverService.browseFiles(parentId)
-                _uiState.value = LibraryState.Files(files, browseStack.toList())
+        val currentStack = _uiState.value.navigationStack
+        if (currentStack.size > 1) {
+            val newStack = currentStack.dropLast(1)
+            val previousItem = newStack.last()
+            
+            // We need to reload the previous level
+            // This is a bit inefficient as we reload instead of caching, but works for now
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+                try {
+                    val children = jRiverService.browseChildren(previousItem.id)
+                    val tracks = jRiverService.browseFiles(previousItem.id)
+                    _uiState.value = _uiState.value.copy(
+                        navigationStack = newStack,
+                        children = children,
+                        tracks = tracks,
+                        isLoading = false
+                    )
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
+                }
             }
         }
     }
 
-    fun search(query: String) {
-        if (query.isBlank()) {
-            loadRoot()
-            return
+    fun onSearchQueryChange(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        if (query.length >= 3) {
+            search(query)
+        } else {
+            _uiState.value = _uiState.value.copy(searchResults = emptyList())
         }
-        
+    }
+
+    fun search(query: String) {
         viewModelScope.launch {
-            _uiState.value = LibraryState.Loading
-            val results = jRiverService.search("[Media Type]=Audio ([Name] contains $query OR [Artist] contains $query OR [Album] contains $query)")
-            _uiState.value = LibraryState.SearchResults(results, query)
+            try {
+                val results = jRiverService.search(query)
+                _uiState.value = _uiState.value.copy(searchResults = results)
+            } catch (e: Exception) {
+                // Ignore search errors for now
+            }
         }
     }
 

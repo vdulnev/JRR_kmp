@@ -7,8 +7,10 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.*
 import nl.adaptivity.xmlutil.serialization.XML
+import org.koin.core.annotation.Single
 import kotlin.random.Random
 
+@Single
 class JRiverMcwsClient(
     private val httpClient: HttpClient,
     private val api: McwsApi,

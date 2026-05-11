@@ -5,12 +5,14 @@ import com.example.jrr.domain.model.*
 import com.example.jrr.player.LocalPlayer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import org.koin.core.annotation.Single
 
+@Single
 class JRiverService(
     private val mcwsClient: JRiverMcwsClient,
-    private val localPlayer: LocalPlayer,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val localPlayer: LocalPlayer
 ) {
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val localZone = Zone(id = "local", name = "This Device", guid = "local_guid", isDLNA = false, isLocal = true)
 
     private val _playerStatus = MutableStateFlow<PlayerStatus?>(null)

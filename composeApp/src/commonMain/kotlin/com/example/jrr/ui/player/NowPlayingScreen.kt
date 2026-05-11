@@ -2,6 +2,8 @@ package com.example.jrr.ui.player
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -95,13 +97,13 @@ fun NowPlayingScreen(
 
         // Volume Slider
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.VolumeDown, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+            Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
             ObsidianVolumeSlider(
                 value = status?.volume ?: 0f,
                 onValueChange = { viewModel.setVolume(it) },
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
             )
-            Icon(Icons.Default.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+            Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
         }
 
         Spacer(modifier = Modifier.height(16.dp))

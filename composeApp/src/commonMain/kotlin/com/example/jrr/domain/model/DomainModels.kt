@@ -12,6 +12,14 @@ data class ServerInfo(
 )
 
 @Serializable
+data class SavedServer(
+    val address: String,
+    val accessKey: String?,
+    val name: String,
+    val lastUsed: Long
+)
+
+@Serializable
 data class Zone(
     val id: String,
     val name: String,

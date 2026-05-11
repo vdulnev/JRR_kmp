@@ -1,6 +1,7 @@
 package com.example.jrr.service
 
 import co.touchlab.kermit.Logger
+import com.example.jrr.data.local.JRiverSettings
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
 import com.example.jrr.domain.model.*
 import com.example.jrr.player.LocalPlayer
@@ -11,7 +12,8 @@ import org.koin.core.annotation.Single
 @Single
 class JRiverService(
     private val mcwsClient: JRiverMcwsClient,
-    private val localPlayer: LocalPlayer
+    private val localPlayer: LocalPlayer,
+    private val settings: JRiverSettings
 ) {
     private val logger = Logger.withTag("JRiverService")
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -26,7 +28,7 @@ class JRiverService(
     private val _currentQueue = MutableStateFlow<List<PlayingNowItem>>(emptyList())
     val currentQueue: StateFlow<List<PlayingNowItem>> = _currentQueue.asStateFlow()
 
-    private var activeZoneId: String? = "local"
+    private var activeZoneId: String? = null // Start as null to trigger initial restoration
     private var lastChangeCounter: Int = -1
     private var pollingJob: Job? = null
     private var zonesPollingJob: Job? = null
@@ -35,7 +37,21 @@ class JRiverService(
 
     fun start() {
         logger.i { "Starting service" }
-        updateLocalStatus() // Initialize with local status
+        
+        // Initial restoration attempt
+        scope.launch {
+            val savedGuid = settings.lastZoneGuid.first()
+            logger.d { "Startup - Saved zone GUID: $savedGuid" }
+            if (savedGuid == "local_guid" || savedGuid == null) {
+                logger.i { "Restoring 'local' zone on startup" }
+                activeZoneId = "local"
+                updateLocalStatus()
+            } else {
+                // We'll wait for pollZones to find the GUID
+                logger.d { "Waiting for pollZones to restore $savedGuid" }
+            }
+        }
+
         startPlaybackPolling()
         startZonesPolling()
         
@@ -61,6 +77,16 @@ class JRiverService(
     fun setActiveZone(zoneId: String) {
         logger.i { "Setting active zone to $zoneId" }
         activeZoneId = zoneId
+        
+        // Persist GUID
+        scope.launch {
+            val zone = _zones.value.find { it.id == zoneId }
+            if (zone != null) {
+                logger.d { "Saving last zone GUID: ${zone.guid}" }
+                settings.saveLastZone(zone.guid)
+            }
+        }
+
         if (zoneId == "local") {
             updateLocalStatus()
         } else {
@@ -73,7 +99,7 @@ class JRiverService(
         pollingJob?.cancel()
         pollingJob = scope.launch {
             while (isActive) {
-                if (activeZoneId != "local") {
+                if (activeZoneId != null && activeZoneId != "local") {
                     pollPlaybackInfo()
                 }
                 val currentStatus = _playerStatus.value
@@ -116,17 +142,33 @@ class JRiverService(
     private suspend fun pollZones() {
         logger.v { "Polling zones..." }
         mcwsClient.getZones().fold(
-            onSuccess = { zones ->
-                logger.d { "Successfully polled ${zones.size} zones from server" }
-                _zones.value = zones + localZone
-                if (activeZoneId == null && zones.isNotEmpty()) {
-                    logger.i { "No active zone, selecting first: ${zones.first().name}" }
-                    setActiveZone(zones.first().id)
+            onSuccess = { zonesFromServer ->
+                logger.d { "Successfully polled ${zonesFromServer.size} zones from server" }
+                val allZones = zonesFromServer + localZone
+                _zones.value = allZones
+                
+                if (activeZoneId == null) {
+                    val savedGuid = settings.lastZoneGuid.first()
+                    val restoredZone = allZones.find { it.guid == savedGuid }
+                    
+                    if (restoredZone != null) {
+                        logger.i { "Restored last selected zone: ${restoredZone.name} (id: ${restoredZone.id})" }
+                        setActiveZone(restoredZone.id)
+                    } else if (zonesFromServer.isNotEmpty()) {
+                        logger.i { "Last selected zone not found, selecting first: ${zonesFromServer.first().name}" }
+                        setActiveZone(zonesFromServer.first().id)
+                    } else {
+                        logger.i { "No server zones found, selecting local" }
+                        setActiveZone("local")
+                    }
                 }
             },
             onFailure = { 
                 logger.w { "Failed to poll zones: ${it.message}" }
                 _zones.value = listOf(localZone)
+                if (activeZoneId == null) {
+                    setActiveZone("local")
+                }
             }
         )
     }

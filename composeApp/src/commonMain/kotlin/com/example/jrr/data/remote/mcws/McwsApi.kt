@@ -14,7 +14,10 @@ class McwsApi(
         params: Map<String, String> = emptyMap(),
         token: String? = null
     ): String {
-        val response = httpClient.get("$baseUrl/MCWS/v1/$endpoint") {
+        val url = "$baseUrl/MCWS/v1/$endpoint"
+        println("McwsApi: Requesting URL: $url")
+        
+        val response = httpClient.get(url) {
             params.forEach { (key, value) ->
                 parameter(key, value)
             }
@@ -24,6 +27,7 @@ class McwsApi(
         }
         
         if (!response.status.isSuccess()) {
+            println("McwsApi: ERROR - Request failed with status ${response.status} for URL $url")
             throw Exception("MCWS request failed: ${response.status}")
         }
         

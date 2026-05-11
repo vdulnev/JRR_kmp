@@ -11,25 +11,27 @@ class JRiverService(
     private val localPlayer: LocalPlayer,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
+    private val localZone = Zone(id = "local", name = "This Device", guid = "local_guid", isDLNA = false, isLocal = true)
+
     private val _playerStatus = MutableStateFlow<PlayerStatus?>(null)
     val playerStatus: StateFlow<PlayerStatus?> = _playerStatus.asStateFlow()
 
-    private val _zones = MutableStateFlow<List<Zone>>(emptyList())
+    private val _zones = MutableStateFlow<List<Zone>>(listOf(localZone))
     val zones: StateFlow<List<Zone>> = _zones.asStateFlow()
 
     private val _currentQueue = MutableStateFlow<List<PlayingNowItem>>(emptyList())
     val currentQueue: StateFlow<List<PlayingNowItem>> = _currentQueue.asStateFlow()
 
-    private var activeZoneId: String? = null
+    private var activeZoneId: String? = "local"
     private var lastChangeCounter: Int = -1
     private var pollingJob: Job? = null
     private var zonesPollingJob: Job? = null
     
     private var currentLocalTrack: Track? = null
-    private val localZone = Zone(id = "local", name = "This Device", guid = "local_guid", isDLNA = false, isLocal = true)
 
     fun start() {
         println("JRiverService: Starting service")
+        updateLocalStatus() // Initialize with local status
         startPlaybackPolling()
         startZonesPolling()
         
@@ -104,8 +106,10 @@ class JRiverService(
     }
 
     private suspend fun pollZones() {
+        println("JRiverService: Polling zones...")
         mcwsClient.getZones().fold(
             onSuccess = { zones ->
+                println("JRiverService: Successfully polled ${zones.size} zones from server")
                 _zones.value = zones + localZone
                 if (activeZoneId == null && zones.isNotEmpty()) {
                     println("JRiverService: No active zone, selecting first: ${zones.first().name}")

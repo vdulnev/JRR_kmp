@@ -37,6 +37,7 @@ kotlin {
             implementation(libs.slf4j.android)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.session)
+            implementation(libs.koin.android)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -66,6 +67,9 @@ kotlin {
             // Image Loading
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

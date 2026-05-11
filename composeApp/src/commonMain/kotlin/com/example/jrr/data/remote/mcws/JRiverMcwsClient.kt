@@ -7,21 +7,29 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.*
 import nl.adaptivity.xmlutil.serialization.XML
+import kotlin.random.Random
 
 class JRiverMcwsClient(
     private val httpClient: HttpClient,
     private val api: McwsApi,
     private val xml: XML
 ) {
+    val instanceId = Random.nextInt(1000, 9999)
     private var baseUrl: String = ""
     private var token: String? = null
 
+    init {
+        println("JRiverMcwsClient($instanceId): Initialized")
+    }
+
     fun updateConfig(baseUrl: String, token: String?) {
+        println("JRiverMcwsClient($instanceId): Updating config - baseUrl: $baseUrl, token: ${token?.take(5)}...")
         this.baseUrl = baseUrl
         this.token = token
     }
 
     suspend fun alive(hostAddress: String): Result<ServerInfo> = runCatching {
+        println("JRiverMcwsClient($instanceId): Calling Alive on $hostAddress")
         val responseXml = api.get(hostAddress, "Alive")
         val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
         val map = response.toMap()
@@ -36,6 +44,7 @@ class JRiverMcwsClient(
     }
 
     suspend fun authenticate(hostAddress: String, username: String, password: String): Result<String> = runCatching {
+        println("JRiverMcwsClient($instanceId): Calling Authenticate on $hostAddress")
         val authHeader = "Basic ${"$username:$password".encodeBase64()}"
         val response = httpClient.get("$hostAddress/MCWS/v1/Authenticate") {
             header(HttpHeaders.Authorization, authHeader)
@@ -51,6 +60,11 @@ class JRiverMcwsClient(
     }
 
     suspend fun getPlaybackInfo(zoneId: String? = null): Result<PlayerStatus> = runCatching {
+        if (baseUrl.isBlank()) {
+            println("JRiverMcwsClient($instanceId): ERROR - getPlaybackInfo called with BLANK baseUrl")
+            throw Exception("baseUrl is not configured")
+        }
+        println("JRiverMcwsClient($instanceId): getPlaybackInfo using baseUrl: $baseUrl")
         val params = mutableMapOf<String, String>()
         if (zoneId != null) {
             params["Zone"] = zoneId
@@ -136,6 +150,11 @@ class JRiverMcwsClient(
     }
 
     suspend fun getZones(): Result<List<Zone>> = runCatching {
+        if (baseUrl.isBlank()) {
+            println("JRiverMcwsClient($instanceId): ERROR - getZones called with BLANK baseUrl")
+            throw Exception("baseUrl is not configured")
+        }
+        println("JRiverMcwsClient($instanceId): getZones using baseUrl: $baseUrl")
         val responseXml = api.get(baseUrl, "Playback/Zones", token = token)
         val mcwsResponse = xml.decodeFromString(McwsResponse.serializer(), responseXml)
         val map = mcwsResponse.toMap()
@@ -153,6 +172,11 @@ class JRiverMcwsClient(
     }
 
     suspend fun getPlayingNow(zoneId: String): Result<List<PlayingNowItem>> = runCatching {
+        if (baseUrl.isBlank()) {
+            println("JRiverMcwsClient($instanceId): ERROR - getPlayingNow called with BLANK baseUrl")
+            throw Exception("baseUrl is not configured")
+        }
+        println("JRiverMcwsClient($instanceId): getPlayingNow using baseUrl: $baseUrl")
         val params = mapOf(
             "Action" to "JSON",
             "Zone" to zoneId,
@@ -202,7 +226,7 @@ class JRiverMcwsClient(
 
         // Fallback: If metadata is missing (only Key is present), fetch it via Files/Search
         if (items.isNotEmpty() && items.all { it.name.isBlank() && it.fileKey.isNotBlank() }) {
-            println("JRiverMcwsClient: Metadata missing in Playlist response. Fetching via fallback search.")
+            println("JRiverMcwsClient($instanceId): Metadata missing in Playlist response. Fetching via fallback search.")
             val keys = items.joinToString(",") { it.fileKey }
             val metadataResult = getTracksByKeys(keys)
             metadataResult.fold(
@@ -216,7 +240,7 @@ class JRiverMcwsClient(
                     }
                 },
                 onFailure = { 
-                    println("JRiverMcwsClient: Fallback metadata fetch failed: ${it.message}")
+                    println("JRiverMcwsClient($instanceId): Fallback metadata fetch failed: ${it.message}")
                     items 
                 }
             )
@@ -313,22 +337,8 @@ class JRiverMcwsClient(
         api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
     }
 
-    // Streaming
     fun buildStreamUrl(fileKey: String, conversion: String = "wav", quality: String = "high"): String {
         return "$baseUrl/MCWS/v1/File/GetFile?File=$fileKey&FileType=Key&Playback=1&Conversion=$conversion&Quality=$quality&Token=$token"
-    }
-
-    // Library Operations
-    
-    /**
-     * Escapes special MCWS query characters: [ ] ( ) -
-     */
-    private fun escapeMcws(value: String): String {
-        return value.replace("[", "/[")
-            .replace("]", "/]")
-            .replace("(", "/(")
-            .replace(")", "/)")
-            .replace("-", "/-")
     }
 
     suspend fun browseChildren(id: String = "-1"): Result<List<BrowseItem>> = runCatching {
@@ -338,8 +348,6 @@ class JRiverMcwsClient(
         )
         val responseXml = api.get(baseUrl, "Browse/Children", params, token)
         val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
-        
-        // In Browse/Children, the Item value is the ID, and Name is the label
         response.items.map { BrowseItem(it.value, it.name) }
     }
 

@@ -1,6 +1,7 @@
 package com.example.jrr
 
 import androidx.compose.runtime.*
+import co.touchlab.kermit.Logger
 import com.example.jrr.data.local.JRiverSettings
 import com.example.jrr.service.JRiverService
 import com.example.jrr.ui.player.NowPlayingContainer
@@ -13,6 +14,8 @@ import org.koin.compose.koinInject
 
 @Composable
 fun App() {
+    val logger = remember { Logger.withTag("App") }
+    
     KoinContext {
         val settings: JRiverSettings = koinInject()
         val jRiverService: JRiverService = koinInject()
@@ -24,21 +27,27 @@ fun App() {
         var currentScreen by remember { mutableStateOf<Screen>(Screen.Setup) }
 
         LaunchedEffect(serverAddress, authToken) {
-            println("App: LaunchedEffect triggered - serverAddress: $serverAddress, token: ${authToken?.take(5)}...")
+            logger.i { "LaunchedEffect - serverAddress: $serverAddress, token: ${authToken?.take(5)}..." }
             if (serverAddress != null) {
+                logger.d { "Configuring client and starting service with $serverAddress" }
                 mcwsClient.updateConfig(serverAddress!!, authToken)
                 jRiverService.start()
                 currentScreen = Screen.Player
             } else {
+                logger.d { "No server address found. Showing Setup screen." }
                 currentScreen = Screen.Setup
             }
         }
+
         when (currentScreen) {
             Screen.Setup -> {
                 val setupViewModel: SetupViewModel = koinViewModel()
                 SetupScreen(
                     viewModel = setupViewModel,
-                    onSuccess = { currentScreen = Screen.Player }
+                    onSuccess = { 
+                        logger.i { "Setup successful. Navigating to Player." }
+                        currentScreen = Screen.Player 
+                    }
                 )
             }
             Screen.Player -> {

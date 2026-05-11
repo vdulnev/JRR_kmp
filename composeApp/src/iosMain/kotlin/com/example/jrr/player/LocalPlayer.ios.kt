@@ -1,5 +1,6 @@
 package com.example.jrr.player
 
+import co.touchlab.kermit.Logger
 import com.example.jrr.domain.model.PlaybackState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import platform.darwin.NSObject
 import kotlinx.cinterop.*
 
 class IosLocalPlayer : LocalPlayer {
+    private val logger = Logger.withTag("IosLocalPlayer")
     private var player: AVPlayer? = null
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -31,6 +33,7 @@ class IosLocalPlayer : LocalPlayer {
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
     init {
+        logger.d { "Initializing AVPlayer" }
         scope.launch {
             while (true) {
                 player?.let { p ->
@@ -56,7 +59,11 @@ class IosLocalPlayer : LocalPlayer {
     }
 
     override fun play(url: String) {
-        val nsUrl = NSURL.URLWithString(url) ?: return
+        logger.i { "Playing URL: $url" }
+        val nsUrl = NSURL.URLWithString(url) ?: run {
+            logger.e { "Invalid URL: $url" }
+            return
+        }
         val playerItem = AVPlayerItem.playerItemWithURL(nsUrl)
         if (player == null) {
             player = AVPlayer.playerWithPlayerItem(playerItem)
@@ -67,25 +74,30 @@ class IosLocalPlayer : LocalPlayer {
     }
 
     override fun pause() {
+        logger.d { "Pause" }
         player?.pause()
     }
 
     override fun resume() {
+        logger.d { "Resume" }
         player?.play()
     }
 
     override fun stop() {
+        logger.d { "Stop" }
         player?.pause()
         player?.replaceCurrentItemWithPlayerItem(null)
         _playbackState.value = PlaybackState.STOPPED
     }
 
     override fun seekTo(positionMs: Int) {
+        logger.d { "Seek to $positionMs" }
         val time = CMTimeMake(positionMs.toLong(), 1000)
         player?.seekToTime(time)
     }
 
     override fun setVolume(level: Float) {
+        logger.v { "Set volume to $level" }
         player?.volume = level
         _volume.value = level
     }

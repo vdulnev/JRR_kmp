@@ -1,5 +1,6 @@
 package com.example.jrr.data.remote.mcws
 
+import co.touchlab.kermit.Logger
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -10,6 +11,8 @@ import org.koin.core.annotation.Single
 class McwsApi(
     private val httpClient: HttpClient
 ) {
+    private val logger = Logger.withTag("McwsApi")
+
     suspend fun get(
         baseUrl: String,
         endpoint: String,
@@ -17,7 +20,7 @@ class McwsApi(
         token: String? = null
     ): String {
         val url = "$baseUrl/MCWS/v1/$endpoint"
-        println("McwsApi: Requesting URL: $url")
+        logger.d { "Requesting URL: $url" }
         
         val response = httpClient.get(url) {
             params.forEach { (key, value) ->
@@ -29,7 +32,7 @@ class McwsApi(
         }
         
         if (!response.status.isSuccess()) {
-            println("McwsApi: ERROR - Request failed with status ${response.status} for URL $url")
+            logger.e { "Request failed with status ${response.status} for URL $url" }
             throw Exception("MCWS request failed: ${response.status}")
         }
         

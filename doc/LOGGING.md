@@ -52,4 +52,21 @@ jvmMain.dependencies {
 ```
 
 ## 5. Adding Custom Logs
-To add your own logs in `commonMain`, you can use `println()` for simple debugging, or integrate a multiplatform logging library like [Napier](https://github.com/AAiraa/Napier) or [Kermit](https://github.com/touchlab/Kermit) if more advanced features (like log levels and crashlytics integration) are required.
+To add your own logs, use the **Kermit** logging library which is integrated across the project.
+
+Example usage:
+```kotlin
+private val logger = Logger.withTag("MyComponent")
+
+fun doSomething() {
+    logger.i { "Doing something..." }
+    try {
+        // ...
+    } catch (e: Exception) {
+        logger.e(e) { "Something went wrong" }
+    }
+}
+```
+
+Kermit provides different log levels: `v` (verbose), `d` (debug), `i` (info), `w` (warn), `e` (error).
+On Android, these are routed to Logcat. On iOS, they go to NSLog. On JVM, they are routed through SLF4J/Logback.

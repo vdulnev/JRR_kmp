@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import co.touchlab.kermit.Logger
 import com.example.jrr.domain.model.PlaybackState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AndroidLocalPlayer(context: Context) : LocalPlayer {
+    private val logger = Logger.withTag("AndroidLocalPlayer")
     private val exoPlayer = ExoPlayer.Builder(context).build()
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -31,18 +33,26 @@ class AndroidLocalPlayer(context: Context) : LocalPlayer {
     override val volume: StateFlow<Float> = _volume.asStateFlow()
 
     init {
+        logger.d { "Initializing ExoPlayer" }
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                _playbackState.value = when (state) {
+                val newState = when (state) {
                     Player.STATE_BUFFERING, Player.STATE_READY -> if (exoPlayer.playWhenReady) PlaybackState.PLAYING else PlaybackState.PAUSED
                     Player.STATE_ENDED, Player.STATE_IDLE -> PlaybackState.STOPPED
                     else -> PlaybackState.STOPPED
                 }
+                logger.v { "ExoPlayer state changed: $state -> $newState" }
+                _playbackState.value = newState
                 _durationMs.value = exoPlayer.duration.coerceAtLeast(0).toInt()
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                logger.v { "ExoPlayer isPlaying changed: $isPlaying" }
                 _playbackState.value = if (isPlaying) PlaybackState.PLAYING else PlaybackState.PAUSED
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                logger.e(error) { "ExoPlayer error: ${error.message}" }
             }
         })
 
@@ -58,6 +68,7 @@ class AndroidLocalPlayer(context: Context) : LocalPlayer {
     }
 
     override fun play(url: String) {
+        logger.i { "Playing URL: $url" }
         val mediaItem = MediaItem.fromUri(url)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
@@ -65,22 +76,27 @@ class AndroidLocalPlayer(context: Context) : LocalPlayer {
     }
 
     override fun pause() {
+        logger.d { "Pause" }
         exoPlayer.pause()
     }
 
     override fun resume() {
+        logger.d { "Resume" }
         exoPlayer.play()
     }
 
     override fun stop() {
+        logger.d { "Stop" }
         exoPlayer.stop()
     }
 
     override fun seekTo(positionMs: Int) {
+        logger.d { "Seek to $positionMs" }
         exoPlayer.seekTo(positionMs.toLong())
     }
 
     override fun setVolume(level: Float) {
+        logger.v { "Set volume to $level" }
         exoPlayer.volume = level
         _volume.value = level
     }

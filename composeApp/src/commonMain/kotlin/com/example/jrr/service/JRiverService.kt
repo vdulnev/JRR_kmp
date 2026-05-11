@@ -1,5 +1,6 @@
 package com.example.jrr.service
 
+import co.touchlab.kermit.Logger
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
 import com.example.jrr.domain.model.*
 import com.example.jrr.player.LocalPlayer
@@ -12,6 +13,7 @@ class JRiverService(
     private val mcwsClient: JRiverMcwsClient,
     private val localPlayer: LocalPlayer
 ) {
+    private val logger = Logger.withTag("JRiverService")
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val localZone = Zone(id = "local", name = "This Device", guid = "local_guid", isDLNA = false, isLocal = true)
 
@@ -32,14 +34,17 @@ class JRiverService(
     private var currentLocalTrack: Track? = null
 
     fun start() {
-        println("JRiverService: Starting service")
+        logger.i { "Starting service" }
         updateLocalStatus() // Initialize with local status
         startPlaybackPolling()
         startZonesPolling()
         
         // Watch local player state to update PlayerStatus when active
         scope.launch {
-            localPlayer.playbackState.collect { updateLocalStatus() }
+            localPlayer.playbackState.collect { 
+                logger.v { "Local player state changed: $it" }
+                updateLocalStatus() 
+            }
         }
         scope.launch {
             localPlayer.currentPositionMs.collect { updateLocalStatus() }
@@ -47,13 +52,14 @@ class JRiverService(
     }
 
     fun stop() {
+        logger.i { "Stopping service" }
         pollingJob?.cancel()
         zonesPollingJob?.cancel()
         localPlayer.stop()
     }
 
     fun setActiveZone(zoneId: String) {
-        println("JRiverService: Setting active zone to $zoneId")
+        logger.i { "Setting active zone to $zoneId" }
         activeZoneId = zoneId
         if (zoneId == "local") {
             updateLocalStatus()
@@ -96,30 +102,30 @@ class JRiverService(
             onSuccess = { status ->
                 _playerStatus.value = status
                 if (status.playingNowChangeCounter != lastChangeCounter) {
-                    println("JRiverService: Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks in server info: ${status.playingNowTracks}. Fetching queue.")
+                    logger.d { "Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks in server info: ${status.playingNowTracks}. Fetching queue." }
                     lastChangeCounter = status.playingNowChangeCounter
                     fetchQueue(status.zoneId)
                 }
             },
             onFailure = {
-                println("JRiverService: Failed to poll playback info: ${it.message}")
+                logger.w { "Failed to poll playback info: ${it.message}" }
             }
         )
     }
 
     private suspend fun pollZones() {
-        println("JRiverService: Polling zones...")
+        logger.v { "Polling zones..." }
         mcwsClient.getZones().fold(
             onSuccess = { zones ->
-                println("JRiverService: Successfully polled ${zones.size} zones from server")
+                logger.d { "Successfully polled ${zones.size} zones from server" }
                 _zones.value = zones + localZone
                 if (activeZoneId == null && zones.isNotEmpty()) {
-                    println("JRiverService: No active zone, selecting first: ${zones.first().name}")
+                    logger.i { "No active zone, selecting first: ${zones.first().name}" }
                     setActiveZone(zones.first().id)
                 }
             },
             onFailure = { 
-                println("JRiverService: Failed to poll zones: ${it.message}")
+                logger.w { "Failed to poll zones: ${it.message}" }
                 _zones.value = listOf(localZone)
             }
         )
@@ -171,15 +177,14 @@ class JRiverService(
 
     private suspend fun fetchQueue(zoneId: String) {
         if (zoneId == "local") return // Local queue is managed client-side or from a server-side list
-        println("JRiverService: Fetching queue for zone $zoneId")
+        logger.d { "Fetching queue for zone $zoneId" }
         mcwsClient.getPlayingNow(zoneId).fold(
             onSuccess = { 
-                println("JRiverService: Successfully fetched queue (${it.size} items)")
+                logger.d { "Successfully fetched queue (${it.size} items)" }
                 _currentQueue.value = it 
             },
             onFailure = { 
-                println("JRiverService: Failed to fetch queue: ${it.message}")
-                it.printStackTrace()
+                logger.e(it) { "Failed to fetch queue: ${it.message}" }
             }
         )
     }
@@ -211,6 +216,7 @@ class JRiverService(
     }
 
     fun playTrack(track: Track) {
+        logger.i { "Playing track: ${track.name} (zone: $activeZoneId)" }
         if (activeZoneId == "local") {
             currentLocalTrack = track
             val url = mcwsClient.buildStreamUrl(track.fileKey.toString())
@@ -234,14 +240,32 @@ class JRiverService(
 
     // Library Operations
     suspend fun browseChildren(id: String = "-1"): List<BrowseItem> {
-        return mcwsClient.browseChildren(id).getOrDefault(emptyList())
+        return mcwsClient.browseChildren(id).fold(
+            onSuccess = { it },
+            onFailure = { 
+                logger.e { "Failed to browse children for ID $id: ${it.message}" }
+                emptyList() 
+            }
+        )
     }
 
     suspend fun browseFiles(id: String): List<Track> {
-        return mcwsClient.browseFiles(id).getOrDefault(emptyList())
+        return mcwsClient.browseFiles(id).fold(
+            onSuccess = { it },
+            onFailure = { 
+                logger.e { "Failed to browse files for ID $id: ${it.message}" }
+                emptyList() 
+            }
+        )
     }
 
     suspend fun search(query: String, limit: Int = -1): List<Track> {
-        return mcwsClient.searchFiles(query, limit = limit).getOrDefault(emptyList())
+        return mcwsClient.searchFiles(query, limit = limit).fold(
+            onSuccess = { it },
+            onFailure = { 
+                logger.e { "Failed to search for '$query': ${it.message}" }
+                emptyList() 
+            }
+        )
     }
 }

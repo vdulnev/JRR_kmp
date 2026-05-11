@@ -1,5 +1,6 @@
 package com.example.jrr.data.remote.mcws
 
+import co.touchlab.kermit.Logger
 import com.example.jrr.domain.model.*
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -16,22 +17,23 @@ class JRiverMcwsClient(
     private val api: McwsApi,
     private val xml: XML
 ) {
+    private val logger = Logger.withTag("JRiverMcwsClient")
     val instanceId = Random.nextInt(1000, 9999)
     private var baseUrl: String = ""
     private var token: String? = null
 
     init {
-        println("JRiverMcwsClient($instanceId): Initialized")
+        logger.i { "Initialized (instanceId: $instanceId)" }
     }
 
     fun updateConfig(baseUrl: String, token: String?) {
-        println("JRiverMcwsClient($instanceId): Updating config - baseUrl: $baseUrl, token: ${token?.take(5)}...")
+        logger.i { "Updating config - instanceId: $instanceId, baseUrl: $baseUrl, token: ${token?.take(5)}..." }
         this.baseUrl = baseUrl
         this.token = token
     }
 
     suspend fun alive(hostAddress: String): Result<ServerInfo> = runCatching {
-        println("JRiverMcwsClient($instanceId): Calling Alive on $hostAddress")
+        logger.d { "Calling Alive on $hostAddress (instanceId: $instanceId)" }
         val responseXml = api.get(hostAddress, "Alive")
         val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
         val map = response.toMap()
@@ -46,7 +48,7 @@ class JRiverMcwsClient(
     }
 
     suspend fun authenticate(hostAddress: String, username: String, password: String): Result<String> = runCatching {
-        println("JRiverMcwsClient($instanceId): Calling Authenticate on $hostAddress")
+        logger.d { "Calling Authenticate on $hostAddress (instanceId: $instanceId)" }
         val authHeader = "Basic ${"$username:$password".encodeBase64()}"
         val response = httpClient.get("$hostAddress/MCWS/v1/Authenticate") {
             header(HttpHeaders.Authorization, authHeader)
@@ -57,16 +59,17 @@ class JRiverMcwsClient(
             val mcwsResponse = xml.decodeFromString(McwsResponse.serializer(), responseXml)
             mcwsResponse.toMap()["token"] ?: throw Exception("Token not found in response")
         } else {
+            logger.e { "Authentication failed with status ${response.status} (instanceId: $instanceId)" }
             throw Exception("Authentication failed: ${response.status}")
         }
     }
 
     suspend fun getPlaybackInfo(zoneId: String? = null): Result<PlayerStatus> = runCatching {
         if (baseUrl.isBlank()) {
-            println("JRiverMcwsClient($instanceId): ERROR - getPlaybackInfo called with BLANK baseUrl")
+            logger.e { "getPlaybackInfo called with BLANK baseUrl (instanceId: $instanceId)" }
             throw Exception("baseUrl is not configured")
         }
-        println("JRiverMcwsClient($instanceId): getPlaybackInfo using baseUrl: $baseUrl")
+        logger.v { "getPlaybackInfo using baseUrl: $baseUrl (instanceId: $instanceId)" }
         val params = mutableMapOf<String, String>()
         if (zoneId != null) {
             params["Zone"] = zoneId
@@ -153,15 +156,16 @@ class JRiverMcwsClient(
 
     suspend fun getZones(): Result<List<Zone>> = runCatching {
         if (baseUrl.isBlank()) {
-            println("JRiverMcwsClient($instanceId): ERROR - getZones called with BLANK baseUrl")
+            logger.e { "getZones called with BLANK baseUrl (instanceId: $instanceId)" }
             throw Exception("baseUrl is not configured")
         }
-        println("JRiverMcwsClient($instanceId): getZones using baseUrl: $baseUrl")
+        logger.d { "getZones using baseUrl: $baseUrl (instanceId: $instanceId)" }
         val responseXml = api.get(baseUrl, "Playback/Zones", token = token)
         val mcwsResponse = xml.decodeFromString(McwsResponse.serializer(), responseXml)
         val map = mcwsResponse.toMap()
         
         val numZones = map["numberzones"]?.toIntOrNull() ?: 0
+        logger.d { "Found $numZones zones in XML (instanceId: $instanceId)" }
         val zones = mutableListOf<Zone>()
         for (i in 0 until numZones) {
             val id = map["zoneid$i"] ?: continue
@@ -175,10 +179,10 @@ class JRiverMcwsClient(
 
     suspend fun getPlayingNow(zoneId: String): Result<List<PlayingNowItem>> = runCatching {
         if (baseUrl.isBlank()) {
-            println("JRiverMcwsClient($instanceId): ERROR - getPlayingNow called with BLANK baseUrl")
+            logger.e { "getPlayingNow called with BLANK baseUrl (instanceId: $instanceId)" }
             throw Exception("baseUrl is not configured")
         }
-        println("JRiverMcwsClient($instanceId): getPlayingNow using baseUrl: $baseUrl")
+        logger.v { "getPlayingNow using baseUrl: $baseUrl (instanceId: $instanceId)" }
         val params = mapOf(
             "Action" to "JSON",
             "Zone" to zoneId,
@@ -228,7 +232,7 @@ class JRiverMcwsClient(
 
         // Fallback: If metadata is missing (only Key is present), fetch it via Files/Search
         if (items.isNotEmpty() && items.all { it.name.isBlank() && it.fileKey.isNotBlank() }) {
-            println("JRiverMcwsClient($instanceId): Metadata missing in Playlist response. Fetching via fallback search.")
+            logger.i { "Metadata missing in Playlist response. Fetching via fallback search. (instanceId: $instanceId)" }
             val keys = items.joinToString(",") { it.fileKey }
             val metadataResult = getTracksByKeys(keys)
             metadataResult.fold(
@@ -242,7 +246,7 @@ class JRiverMcwsClient(
                     }
                 },
                 onFailure = { 
-                    println("JRiverMcwsClient($instanceId): Fallback metadata fetch failed: ${it.message}")
+                    logger.w { "Fallback metadata fetch failed: ${it.message} (instanceId: $instanceId)" }
                     items 
                 }
             )

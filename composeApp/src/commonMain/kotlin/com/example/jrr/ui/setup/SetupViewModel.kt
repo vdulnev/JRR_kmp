@@ -2,6 +2,7 @@ package com.example.jrr.ui.setup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import com.example.jrr.data.local.JRiverSettings
 import com.example.jrr.data.remote.lookup.JRiverLookupService
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
@@ -31,6 +32,7 @@ class SetupViewModel(
     private val settings: JRiverSettings
 ) : ViewModel() {
 
+    private val logger = Logger.withTag("SetupViewModel")
     private val _uiState = MutableStateFlow(SetupUiState())
     val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
 
@@ -62,6 +64,7 @@ class SetupViewModel(
         }
 
         viewModelScope.launch {
+            logger.i { "Attempting to connect (accessKey: ${state.accessKey}, host: ${state.host})" }
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
             val address = if (state.accessKey.isNotBlank()) {
@@ -70,11 +73,13 @@ class SetupViewModel(
                         if (response.ip != null && response.port != null) {
                             "http://${response.ip}:${response.port}"
                         } else {
+                            logger.e { "Could not resolve Access Key: $response" }
                             _uiState.value = _uiState.value.copy(isLoading = false, error = "Could not resolve Access Key")
                             return@launch
                         }
                     },
                     onFailure = {
+                        logger.e(it) { "Lookup failed for key ${state.accessKey}" }
                         _uiState.value = _uiState.value.copy(isLoading = false, error = "Lookup failed: ${it.message}")
                         return@launch
                     }
@@ -83,12 +88,15 @@ class SetupViewModel(
                 "http://${state.host}:${state.port}"
             }
 
+            logger.d { "Resolved server address: $address. Testing with Alive." }
             mcwsClient.alive(address).fold(
                 onSuccess = { serverInfo ->
+                    logger.i { "Server reached successfully: ${serverInfo.name} (${serverInfo.version})" }
                     _uiState.value = _uiState.value.copy(serverInfo = serverInfo)
                     authenticateAndSave(address, serverInfo)
                 },
                 onFailure = {
+                    logger.e(it) { "Server unreachable at $address" }
                     _uiState.value = _uiState.value.copy(isLoading = false, error = "Server unreachable: ${it.message}")
                 }
             )
@@ -97,8 +105,10 @@ class SetupViewModel(
 
     private suspend fun authenticateAndSave(address: String, serverInfo: ServerInfo) {
         val state = _uiState.value
+        logger.i { "Authenticating for user '${state.username}' at $address" }
         mcwsClient.authenticate(address, state.username, state.password).fold(
             onSuccess = { token ->
+                logger.i { "Authentication successful. Saving settings." }
                 settings.saveServerDetails(address, if (state.accessKey.isNotBlank()) state.accessKey else null)
                 settings.saveCredentials(state.username, state.password)
                 settings.saveAuthToken(token)
@@ -106,6 +116,7 @@ class SetupViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
             },
             onFailure = {
+                logger.e(it) { "Authentication failed" }
                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Authentication failed: ${it.message}")
             }
         )

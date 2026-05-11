@@ -3,6 +3,7 @@ package com.example.jrr.di
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
 import org.koin.dsl.KoinAppDeclaration
 
 fun initKoin(
@@ -10,11 +11,10 @@ fun initKoin(
     platformContext: Any? = null,
     appDeclaration: KoinAppDeclaration = {}
 ) {
-    // Prevent multiple startKoin calls
-    if (org.koin.core.context.GlobalContext.getOrNull() == null) {
-        startKoin {
-            appDeclaration()
-            modules(appModule(dataStore, platformContext))
-        }
+    // Ensure Koin is stopped before starting (common KMP pattern to avoid double-start)
+    stopKoin()
+    startKoin {
+        appDeclaration()
+        modules(appModule(dataStore, platformContext))
     }
 }

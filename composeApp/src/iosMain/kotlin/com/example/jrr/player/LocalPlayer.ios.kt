@@ -11,10 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import platform.AVFoundation.*
+import platform.CoreMedia.*
 import platform.Foundation.*
 import platform.darwin.NSObject
 import kotlinx.cinterop.*
 
+@OptIn(ExperimentalForeignApi::class)
 class IosLocalPlayer : LocalPlayer {
     private val logger = Logger.withTag("IosLocalPlayer")
     private var player: AVPlayer? = null
@@ -103,6 +105,7 @@ class IosLocalPlayer : LocalPlayer {
     }
 }
 
+@OptIn(ExperimentalForeignApi::class)
 actual fun createLocalPlayer(context: Any?): LocalPlayer {
     return IosLocalPlayer()
 }

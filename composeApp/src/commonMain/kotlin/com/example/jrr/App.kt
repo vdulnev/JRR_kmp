@@ -8,7 +8,6 @@ import com.example.jrr.ui.player.NowPlayingContainer
 import com.example.jrr.ui.player.PlayerViewModel
 import com.example.jrr.ui.setup.SetupScreen
 import com.example.jrr.ui.setup.SetupViewModel
-import org.koin.compose.KoinContext
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.compose.koinInject
 
@@ -16,48 +15,46 @@ import org.koin.compose.koinInject
 fun App() {
     val logger = remember { Logger.withTag("App") }
     
-    KoinContext {
-        val settings: JRiverSettings = koinInject()
-        val jRiverService: JRiverService = koinInject()
-        val mcwsClient: com.example.jrr.data.remote.mcws.JRiverMcwsClient = koinInject()
+    val settings: JRiverSettings = koinInject()
+    val jRiverService: JRiverService = koinInject()
+    val mcwsClient: com.example.jrr.data.remote.mcws.JRiverMcwsClient = koinInject()
 
-        val serverAddress by settings.serverAddress.collectAsState(null)
-        val authToken by settings.authToken.collectAsState(null)
+    val serverAddress by settings.serverAddress.collectAsState(null)
+    val authToken by settings.authToken.collectAsState(null)
 
-        var currentScreen by remember { mutableStateOf<Screen>(Screen.Setup) }
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Setup) }
 
-        LaunchedEffect(serverAddress, authToken) {
-            logger.i { "LaunchedEffect - serverAddress: $serverAddress, token: ${authToken?.take(5)}..." }
-            if (serverAddress != null) {
-                logger.d { "Configuring client and starting service with $serverAddress" }
-                mcwsClient.updateConfig(serverAddress!!, authToken)
-                jRiverService.start()
-                currentScreen = Screen.Player
-            } else {
-                logger.d { "No server address found. Showing Setup screen." }
-                currentScreen = Screen.Setup
-            }
+    LaunchedEffect(serverAddress, authToken) {
+        logger.i { "LaunchedEffect - serverAddress: $serverAddress, token: ${authToken?.take(5)}..." }
+        if (serverAddress != null) {
+            logger.d { "Configuring client and starting service with $serverAddress" }
+            mcwsClient.updateConfig(serverAddress!!, authToken)
+            jRiverService.start()
+            currentScreen = Screen.Player
+        } else {
+            logger.d { "No server address found. Showing Setup screen." }
+            currentScreen = Screen.Setup
         }
+    }
 
-        when (currentScreen) {
-            Screen.Setup -> {
-                val setupViewModel: SetupViewModel = koinViewModel()
-                SetupScreen(
-                    viewModel = setupViewModel,
-                    onSuccess = { 
-                        logger.i { "Setup successful. Navigating to Player." }
-                        currentScreen = Screen.Player 
-                    }
-                )
-            }
-            Screen.Player -> {
-                val playerViewModel: PlayerViewModel = koinViewModel()
-                NowPlayingContainer(
-                    viewModel = playerViewModel,
-                    jRiverService = jRiverService,
-                    serverAddress = serverAddress ?: ""
-                )
-            }
+    when (currentScreen) {
+        Screen.Setup -> {
+            val setupViewModel: SetupViewModel = koinViewModel()
+            SetupScreen(
+                viewModel = setupViewModel,
+                onSuccess = { 
+                    logger.i { "Setup successful. Navigating to Player." }
+                    currentScreen = Screen.Player 
+                }
+            )
+        }
+        Screen.Player -> {
+            val playerViewModel: PlayerViewModel = koinViewModel()
+            NowPlayingContainer(
+                viewModel = playerViewModel,
+                jRiverService = jRiverService,
+                serverAddress = serverAddress ?: ""
+            )
         }
     }
 }

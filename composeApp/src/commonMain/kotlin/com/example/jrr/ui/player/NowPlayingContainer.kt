@@ -30,10 +30,10 @@ fun NowPlayingContainer(
                 contentColor = Gold
             ) {
                 NavigationBarItem(
-                    selected = selectedTab == PlayerTab.Library,
-                    onClick = { selectedTab = PlayerTab.Library },
-                    icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") },
-                    label = { Text("Library") },
+                    selected = selectedTab == PlayerTab.Player,
+                    onClick = { selectedTab = PlayerTab.Player },
+                    icon = { Icon(Icons.Default.PlayCircle, contentDescription = "Now Playing") },
+                    label = { Text("Playing") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Gold,
                         selectedTextColor = Gold,
@@ -46,6 +46,17 @@ fun NowPlayingContainer(
                     icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Queue") },
                     label = { Text("Queue") },
 
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Gold,
+                        selectedTextColor = Gold,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    )
+                )
+                NavigationBarItem(
+                    selected = selectedTab == PlayerTab.Library,
+                    onClick = { selectedTab = PlayerTab.Library },
+                    icon = { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") },
+                    label = { Text("Library") },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Gold,
                         selectedTextColor = Gold,

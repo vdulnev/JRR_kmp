@@ -3,8 +3,6 @@ package com.example.jrr.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jrr.data.local.JRiverSettings
-import com.example.jrr.data.remote.mcws.JRiverMcwsClient
-import com.example.jrr.domain.model.SavedServer
 import com.example.jrr.service.JRiverService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,7 +23,6 @@ data class SettingsUiState(
 class SettingsViewModel(
     private val settings: JRiverSettings,
     private val jRiverService: JRiverService,
-    private val mcwsClient: JRiverMcwsClient
 ) : ViewModel() {
 
     val uiState: StateFlow<SettingsUiState> = combine(

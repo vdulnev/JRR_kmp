@@ -3,10 +3,9 @@ package com.example.jrr.data.local
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import co.touchlab.kermit.Logger
-import okio.Path.Companion.toPath
 import java.io.File
 
+@Suppress("UNUSED_PARAMETER")
 actual fun createDataStore(context: Any?): DataStore<Preferences> {
     Logger.withTag("DataStoreFactory").i { "Creating JVM DataStore" }
     return PreferenceDataStoreFactory.create(

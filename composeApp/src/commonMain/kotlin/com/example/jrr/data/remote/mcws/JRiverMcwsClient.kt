@@ -204,8 +204,7 @@ class JRiverMcwsClient(
         val responseJson = api.get(baseUrl, "Playback/Playlist", params, token).bind()
 
         val itemsArray = catch({
-            val jsonElement = trackJson.parseToJsonElement(responseJson)
-            when (jsonElement) {
+            when (val jsonElement = trackJson.parseToJsonElement(responseJson)) {
                 is kotlinx.serialization.json.JsonArray -> jsonElement
                 is kotlinx.serialization.json.JsonObject -> {
                     val response = jsonElement["Response"] as? kotlinx.serialization.json.JsonObject
@@ -272,12 +271,9 @@ class JRiverMcwsClient(
 
         catch({
             val jsonElement = trackJson.parseToJsonElement(responseJson)
-            val itemsArray = if (jsonElement is kotlinx.serialization.json.JsonArray) {
-                jsonElement
-            } else {
-                jsonElement.let { it as? kotlinx.serialization.json.JsonObject }?.get("Item") as? kotlinx.serialization.json.JsonArray
-                    ?: emptyList<kotlinx.serialization.json.JsonElement>()
-            }
+            val itemsArray = jsonElement as? kotlinx.serialization.json.JsonArray
+                ?: (jsonElement.let { it as? kotlinx.serialization.json.JsonObject }?.get("Item") as? kotlinx.serialization.json.JsonArray
+                    ?: emptyList<kotlinx.serialization.json.JsonElement>())
 
             itemsArray.map { element ->
                 val obj = element as kotlinx.serialization.json.JsonObject

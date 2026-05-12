@@ -2,7 +2,6 @@ package com.example.jrr.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import com.example.jrr.player.LocalPlayer
 import com.example.jrr.player.createLocalPlayer
 import io.ktor.client.*
 import nl.adaptivity.xmlutil.serialization.XML
@@ -27,7 +26,7 @@ class CoreModule(
     fun httpClient() = HttpClient()
 
     @Single
-    fun xml() = XML { autoPolymorphic = true }
+    fun xml() = XML.v1 { policy { autoPolymorphic = true } }
 
     @Single
     fun localPlayer() = createLocalPlayer(platformContext)

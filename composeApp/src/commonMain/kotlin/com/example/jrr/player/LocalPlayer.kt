@@ -17,4 +17,5 @@ interface LocalPlayer {
     fun setVolume(level: Float)
 }
 
+@Suppress("UNUSED_PARAMETER")
 expect fun createLocalPlayer(context: Any? = null): LocalPlayer

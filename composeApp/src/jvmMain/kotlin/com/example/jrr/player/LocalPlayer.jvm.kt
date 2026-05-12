@@ -51,6 +51,7 @@ class JvmLocalPlayer : LocalPlayer {
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 actual fun createLocalPlayer(context: Any?): LocalPlayer {
     return JvmLocalPlayer()
 }

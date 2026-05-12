@@ -50,7 +50,7 @@ fun ObsidianSecondaryButton(
             contentColor = Gold,
             disabledContentColor = Gold.copy(alpha = 0.5f)
         ),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
+        border = ButtonDefaults.outlinedButtonBorder(enabled = enabled).copy(
             brush = androidx.compose.ui.graphics.SolidColor(if (enabled) Gold else Gold.copy(alpha = 0.5f))
         ),
         shape = MaterialTheme.shapes.small,

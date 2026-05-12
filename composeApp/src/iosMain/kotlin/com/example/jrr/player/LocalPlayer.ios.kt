@@ -13,7 +13,6 @@ import kotlinx.coroutines.launch
 import platform.AVFoundation.*
 import platform.CoreMedia.*
 import platform.Foundation.*
-import platform.darwin.NSObject
 import kotlinx.cinterop.*
 
 @OptIn(ExperimentalForeignApi::class)
@@ -106,6 +105,7 @@ class IosLocalPlayer : LocalPlayer {
 }
 
 @OptIn(ExperimentalForeignApi::class)
+@Suppress("UNUSED_PARAMETER")
 actual fun createLocalPlayer(context: Any?): LocalPlayer {
     return IosLocalPlayer()
 }

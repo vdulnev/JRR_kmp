@@ -41,6 +41,7 @@ fun NowPlayingScreen(
 
         Box(
             modifier = Modifier
+                .widthIn(max = 360.dp)
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(MaterialTheme.shapes.medium)

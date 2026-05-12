@@ -8,6 +8,7 @@ import com.example.jrr.ui.player.NowPlayingContainer
 import com.example.jrr.ui.player.PlayerViewModel
 import com.example.jrr.ui.setup.SetupScreen
 import com.example.jrr.ui.setup.SetupViewModel
+import kotlinx.coroutines.flow.combine
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.compose.koinInject
 
@@ -19,8 +20,13 @@ fun App() {
     val jRiverService: JRiverService = koinInject()
     val mcwsClient: com.example.jrr.data.remote.mcws.JRiverMcwsClient = koinInject()
 
-    val serverAddress by settings.serverAddress.collectAsState(null)
-    val authToken by settings.authToken.collectAsState(null)
+    val session by remember(settings) {
+        combine(settings.serverAddress, settings.authToken) { address, token ->
+            address to token
+        }
+    }.collectAsState(null to null)
+    val serverAddress = session.first
+    val authToken = session.second
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Setup) }
 

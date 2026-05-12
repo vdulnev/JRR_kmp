@@ -169,9 +169,8 @@ class SetupViewModel(
         mcwsClient.authenticate(address, state.username, state.password).fold(
             onSuccess = { token ->
                 logger.i { "Authentication successful. Saving settings." }
-                settings.saveServerDetails(address, accessKey)
+                settings.saveAuthenticatedServer(address, accessKey, token)
                 settings.saveCredentials(state.username, state.password)
-                settings.saveAuthToken(token)
                 
                 // Add to recent servers
                 settings.addRecentServer(SavedServer(

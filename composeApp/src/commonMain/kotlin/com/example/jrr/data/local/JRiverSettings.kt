@@ -61,6 +61,18 @@ class JRiverSettings(
         }
     }
 
+    suspend fun saveAuthenticatedServer(address: String, accessKey: String?, token: String) {
+        dataStore.edit { preferences ->
+            preferences[Keys.SERVER_ADDRESS] = address
+            preferences[Keys.AUTH_TOKEN] = token
+            if (accessKey != null) {
+                preferences[Keys.ACCESS_KEY] = accessKey
+            } else {
+                preferences.remove(Keys.ACCESS_KEY)
+            }
+        }
+    }
+
     suspend fun addRecentServer(server: SavedServer) {
         dataStore.edit { prefs ->
             val current = try {

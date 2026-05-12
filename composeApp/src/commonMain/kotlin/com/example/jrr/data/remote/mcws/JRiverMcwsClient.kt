@@ -344,7 +344,14 @@ class JRiverMcwsClient(
     }
 
     fun buildStreamUrl(fileKey: String, conversion: String = "wav", quality: String = "high"): String {
-        return "$baseUrl/MCWS/v1/File/GetFile?File=$fileKey&FileType=Key&Playback=1&Conversion=$conversion&Quality=$quality&Token=$token"
+        return URLBuilder("$baseUrl/MCWS/v1/File/GetFile").apply {
+            parameters.append("File", fileKey)
+            parameters.append("FileType", "Key")
+            parameters.append("Playback", "1")
+            parameters.append("Conversion", conversion)
+            parameters.append("Quality", quality)
+            token?.takeIf { it.isNotBlank() }?.let { parameters.append("Token", it) }
+        }.buildString()
     }
 
     suspend fun browseChildren(id: String = "-1"): Result<List<BrowseItem>> = runCatching {

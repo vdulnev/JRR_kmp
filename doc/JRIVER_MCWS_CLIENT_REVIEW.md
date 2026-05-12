@@ -43,6 +43,8 @@ Resolution: `JRiverService` is now a coordinator over two backend services. `Mcw
 
 ### Medium: local `next()` and `previous()` route to MCWS
 
+Status: fixed after review.
+
 File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/service/JRiverService.kt`
@@ -51,9 +53,11 @@ Most transport methods special-case `activeZoneId == "local"`, but `next()` and 
 
 Impact: when the local zone is active, these commands send `Zone=local` to MCWS and should fail or hit the wrong control path.
 
-Suggested fix: either implement local queue navigation or no-op/log clearly for the local zone.
+Resolution: `next()` and `previous()` now use remote-only command routing. When the local zone is active, the coordinator logs and ignores those MCWS-only commands instead of sending `Zone=local` to MCWS.
 
 ### Medium: stream URL construction is unsafe
+
+Status: fixed after review.
 
 File:
 
@@ -63,7 +67,7 @@ File:
 
 Impact: local playback can break after the startup token race or when token/conversion/quality values contain reserved URL characters.
 
-Suggested fix: build the URL through Ktor URL/query APIs and omit `Token` when absent.
+Resolution: `buildStreamUrl()` now uses Ktor `URLBuilder` query parameters and only appends `Token` when the token is non-blank.
 
 ### Medium: MCWS JSON parsing misses single-item responses
 

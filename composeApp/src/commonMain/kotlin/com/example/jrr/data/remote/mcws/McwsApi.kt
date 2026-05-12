@@ -1,6 +1,11 @@
 package com.example.jrr.data.remote.mcws
 
+import arrow.core.Either
+import arrow.core.raise.catch
+import arrow.core.raise.either
+import arrow.core.raise.ensure
 import co.touchlab.kermit.Logger
+import com.example.jrr.domain.model.McwsError
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -18,24 +23,26 @@ class McwsApi(
         endpoint: String,
         params: Map<String, String> = emptyMap(),
         token: String? = null
-    ): String {
+    ): Either<McwsError, String> = either {
         val url = "$baseUrl/MCWS/v1/$endpoint"
         logger.d { "Requesting URL: $url" }
-        
-        val response = httpClient.get(url) {
-            params.forEach { (key, value) ->
-                parameter(key, value)
+
+        val response = catch({
+            httpClient.get(url) {
+                params.forEach { (key, value) -> parameter(key, value) }
+                if (token != null) parameter("Token", token)
             }
-            if (token != null) {
-                parameter("Token", token)
-            }
+        }) { t ->
+            raise(McwsError.Network("GET $url failed: ${t.message}", t))
         }
-        
-        if (!response.status.isSuccess()) {
+
+        ensure(response.status.isSuccess()) {
             logger.e { "Request failed with status ${response.status} for URL $url" }
-            throw Exception("MCWS request failed: ${response.status}")
+            McwsError.HttpStatus(response.status.value, "MCWS $endpoint -> ${response.status}")
         }
-        
-        return response.body()
+
+        catch({ response.body<String>() }) { t ->
+            raise(McwsError.Network("Reading body from $url failed: ${t.message}", t))
+        }
     }
 }

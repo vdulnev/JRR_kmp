@@ -1,5 +1,11 @@
 package com.example.jrr.data.remote.mcws
 
+import arrow.core.Either
+import arrow.core.getOrElse
+import arrow.core.raise.catch
+import arrow.core.raise.either
+import arrow.core.raise.ensure
+import arrow.core.raise.ensureNotNull
 import co.touchlab.kermit.Logger
 import com.example.jrr.domain.model.*
 import io.ktor.client.*
@@ -39,12 +45,12 @@ class JRiverMcwsClient(
         this.token = token
     }
 
-    suspend fun alive(hostAddress: String): Result<ServerInfo> = runCatching {
+    suspend fun alive(hostAddress: String): Either<McwsError, ServerInfo> = either {
         logger.d { "Calling Alive on $hostAddress (instanceId: $instanceId)" }
-        val responseXml = api.get(hostAddress, "Alive")
-        val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
+        val responseXml = api.get(hostAddress, "Alive").bind()
+        val response = decodeMcwsXml(responseXml).bind()
         val map = response.toMap()
-        
+
         ServerInfo(
             id = map["runtimeguid"] ?: "",
             name = map["friendlyname"] ?: "",
@@ -54,27 +60,33 @@ class JRiverMcwsClient(
         )
     }
 
-    suspend fun authenticate(hostAddress: String, username: String, password: String): Result<String> = runCatching {
+    suspend fun authenticate(hostAddress: String, username: String, password: String): Either<McwsError, String> = either {
         logger.d { "Calling Authenticate on $hostAddress (instanceId: $instanceId)" }
         val authHeader = "Basic ${"$username:$password".encodeBase64()}"
-        val response = httpClient.get("$hostAddress/MCWS/v1/Authenticate") {
-            header(HttpHeaders.Authorization, authHeader)
-        }
-        
-        if (response.status.isSuccess()) {
-            val responseXml = response.body<String>()
-            val mcwsResponse = xml.decodeFromString(McwsResponse.serializer(), responseXml)
-            mcwsResponse.toMap()["token"] ?: throw Exception("Token not found in response")
-        } else {
+        val response = catch({
+            httpClient.get("$hostAddress/MCWS/v1/Authenticate") {
+                header(HttpHeaders.Authorization, authHeader)
+            }
+        }) { t -> raise(McwsError.Network("Authenticate request failed: ${t.message}", t)) }
+
+        ensure(response.status.isSuccess()) {
             logger.e { "Authentication failed with status ${response.status} (instanceId: $instanceId)" }
-            throw Exception("Authentication failed: ${response.status}")
+            McwsError.Auth("Authentication failed: ${response.status}")
+        }
+
+        val responseXml = catch({ response.body<String>() }) { t ->
+            raise(McwsError.Network("Reading auth body failed: ${t.message}", t))
+        }
+        val mcwsResponse = decodeMcwsXml(responseXml).bind()
+        ensureNotNull(mcwsResponse.toMap()["token"]) {
+            McwsError.Auth("Token not found in authenticate response")
         }
     }
 
-    suspend fun getPlaybackInfo(zoneId: String? = null): Result<PlayerStatus> = runCatching {
-        if (baseUrl.isBlank()) {
+    suspend fun getPlaybackInfo(zoneId: String? = null): Either<McwsError, PlayerStatus> = either {
+        ensure(baseUrl.isNotBlank()) {
             logger.e { "getPlaybackInfo called with BLANK baseUrl (instanceId: $instanceId)" }
-            throw Exception("baseUrl is not configured")
+            McwsError.Unknown("baseUrl is not configured")
         }
         logger.v { "getPlaybackInfo using baseUrl: $baseUrl (instanceId: $instanceId)" }
         val params = mutableMapOf<String, String>()
@@ -82,13 +94,13 @@ class JRiverMcwsClient(
             params["Zone"] = zoneId
             params["ZoneType"] = "ID"
         }
-        
-        val responseXml = api.get(baseUrl, "Playback/Info", params, token)
-        val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
+
+        val responseXml = api.get(baseUrl, "Playback/Info", params, token).bind()
+        val response = decodeMcwsXml(responseXml).bind()
         val map = response.toMap()
-        
+
         val state = PlaybackState.fromInt(map["state"]?.toIntOrNull() ?: 0)
-        
+
         val trackInfo = if (map["filekey"] != null) {
             TrackInfo(
                 fileKey = map["filekey"] ?: "",
@@ -124,70 +136,62 @@ class JRiverMcwsClient(
     }
 
     // Transport Commands
-    suspend fun play(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Play", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun play(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Play", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun pause(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Pause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun pause(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Pause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun playPause(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/PlayPause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun playPause(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/PlayPause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun stop(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Stop", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun stop(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Stop", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun next(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Next", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun next(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Next", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun previous(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Previous", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun previous(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Previous", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
-    suspend fun playByKey(zoneId: String, key: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/PlayByKey", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Key" to key), token)
-    }
+    suspend fun playByKey(zoneId: String, key: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/PlayByKey", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Key" to key), token).map { }
 
-    suspend fun setVolume(zoneId: String, level: Float): Result<Unit> = runCatching {
+    suspend fun setVolume(zoneId: String, level: Float): Either<McwsError, Unit> {
         val mcwsLevel = (level * 100).toInt().coerceIn(0, 100)
-        api.get(baseUrl, "Playback/Volume", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Level" to mcwsLevel.toString()), token)
+        return api.get(baseUrl, "Playback/Volume", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Level" to mcwsLevel.toString()), token).map { }
     }
 
-    suspend fun seek(zoneId: String, positionMs: Int): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/Position", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Position" to positionMs.toString()), token)
-    }
+    suspend fun seek(zoneId: String, positionMs: Int): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/Position", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Position" to positionMs.toString()), token).map { }
 
-    suspend fun getZones(): Result<List<Zone>> = runCatching {
-        if (baseUrl.isBlank()) {
+    suspend fun getZones(): Either<McwsError, List<Zone>> = either {
+        ensure(baseUrl.isNotBlank()) {
             logger.e { "getZones called with BLANK baseUrl (instanceId: $instanceId)" }
-            throw Exception("baseUrl is not configured")
+            McwsError.Unknown("baseUrl is not configured")
         }
         logger.d { "getZones using baseUrl: $baseUrl (instanceId: $instanceId)" }
-        val responseXml = api.get(baseUrl, "Playback/Zones", token = token)
-        val mcwsResponse = xml.decodeFromString(McwsResponse.serializer(), responseXml)
+        val responseXml = api.get(baseUrl, "Playback/Zones", token = token).bind()
+        val mcwsResponse = decodeMcwsXml(responseXml).bind()
         val map = mcwsResponse.toMap()
-        
+
         val numZones = map["numberzones"]?.toIntOrNull() ?: 0
         logger.d { "Found $numZones zones in XML (instanceId: $instanceId)" }
-        val zones = mutableListOf<Zone>()
-        for (i in 0 until numZones) {
-            val id = map["zoneid$i"] ?: continue
-            val name = map["zonename$i"] ?: ""
-            val guid = map["zoneguid$i"] ?: ""
-            val isDLNA = map["zonedlna$i"] == "1"
-            zones.add(Zone(id, name, guid, isDLNA))
+        buildList {
+            for (i in 0 until numZones) {
+                val id = map["zoneid$i"] ?: continue
+                val name = map["zonename$i"] ?: ""
+                val guid = map["zoneguid$i"] ?: ""
+                val isDLNA = map["zonedlna$i"] == "1"
+                add(Zone(id, name, guid, isDLNA))
+            }
         }
-        zones
     }
 
-    suspend fun getPlayingNow(zoneId: String): Result<List<PlayingNowItem>> = runCatching {
-        if (baseUrl.isBlank()) {
+    suspend fun getPlayingNow(zoneId: String): Either<McwsError, List<PlayingNowItem>> = either {
+        ensure(baseUrl.isNotBlank()) {
             logger.e { "getPlayingNow called with BLANK baseUrl (instanceId: $instanceId)" }
-            throw Exception("baseUrl is not configured")
+            McwsError.Unknown("baseUrl is not configured")
         }
         logger.v { "getPlayingNow using baseUrl: $baseUrl (instanceId: $instanceId)" }
         val params = mapOf(
@@ -197,158 +201,150 @@ class JRiverMcwsClient(
             "Fields" to "Key;Name;Artist;Album",
             "NoLocalFilenames" to "1"
         )
-        val responseJson = api.get(baseUrl, "Playback/Playlist", params, token)
-        
-        val json = kotlinx.serialization.json.Json { 
-            ignoreUnknownKeys = true
-            isLenient = true
-        }
-        
-        val jsonElement = json.parseToJsonElement(responseJson)
-        
-        val itemsArray = when {
-            jsonElement is kotlinx.serialization.json.JsonArray -> jsonElement
-            jsonElement is kotlinx.serialization.json.JsonObject -> {
-                val response = jsonElement["Response"] as? kotlinx.serialization.json.JsonObject
-                val target = response ?: jsonElement
-                target["Item"] as? kotlinx.serialization.json.JsonArray
-            }
-            else -> null
-        } ?: throw Exception("Could not find Playlist items in JSON response")
+        val responseJson = api.get(baseUrl, "Playback/Playlist", params, token).bind()
 
-        val items = itemsArray.mapIndexed { index, element ->
-            val obj = element as? kotlinx.serialization.json.JsonObject
-                ?: throw Exception("Expected JsonObject in Playlist array")
-            
-            fun getString(key: String): String {
-                val foundKey = obj.keys.find { it.equals(key, ignoreCase = true) }
-                return foundKey?.let { k ->
-                    val el = obj[k]
-                    if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
-                } ?: ""
+        val itemsArray = catch({
+            val jsonElement = trackJson.parseToJsonElement(responseJson)
+            when (jsonElement) {
+                is kotlinx.serialization.json.JsonArray -> jsonElement
+                is kotlinx.serialization.json.JsonObject -> {
+                    val response = jsonElement["Response"] as? kotlinx.serialization.json.JsonObject
+                    val target = response ?: jsonElement
+                    target["Item"] as? kotlinx.serialization.json.JsonArray
+                }
+                else -> null
             }
+        }) { t -> raise(McwsError.Parse("Playlist JSON parse failed: ${t.message}", t)) }
 
-            PlayingNowItem(
-                index = index,
-                fileKey = getString("Key"),
-                name = getString("Name"),
-                artist = getString("Artist"),
-                album = getString("Album")
-            )
+        ensureNotNull(itemsArray) {
+            McwsError.Parse("Could not find Playlist items in JSON response")
         }
+
+        val items = catch({
+            itemsArray.mapIndexed { index, element ->
+                val obj = element as? kotlinx.serialization.json.JsonObject
+                    ?: error("Expected JsonObject in Playlist array")
+
+                fun getString(key: String): String {
+                    val foundKey = obj.keys.find { it.equals(key, ignoreCase = true) }
+                    return foundKey?.let { k ->
+                        val el = obj[k]
+                        if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
+                    } ?: ""
+                }
+
+                PlayingNowItem(
+                    index = index,
+                    fileKey = getString("Key"),
+                    name = getString("Name"),
+                    artist = getString("Artist"),
+                    album = getString("Album")
+                )
+            }
+        }) { t -> raise(McwsError.Parse("Playlist item parse failed: ${t.message}", t)) }
 
         // Fallback: If metadata is missing (only Key is present), fetch it via Files/Search
         if (items.isNotEmpty() && items.all { it.name.isBlank() && it.fileKey.isNotBlank() }) {
             logger.i { "Metadata missing in Playlist response. Fetching via fallback search. (instanceId: $instanceId)" }
             val keys = items.joinToString(",") { it.fileKey }
-            val metadataResult = getTracksByKeys(keys)
-            metadataResult.fold(
-                onSuccess = { metadataList ->
-                    val metadataMap = metadataList.associateBy { it.fileKey.toString() }
-                    items.map { item ->
-                        val meta = metadataMap[item.fileKey]
-                        if (meta != null) {
-                            item.copy(name = meta.name, artist = meta.artist, album = meta.album)
-                        } else item
-                    }
-                },
-                onFailure = { 
-                    logger.w { "Fallback metadata fetch failed: ${it.message} (instanceId: $instanceId)" }
-                    items 
-                }
-            )
+            val metadataList = getTracksByKeys(keys).getOrElse {
+                logger.w { "Fallback metadata fetch failed: ${it.message} (instanceId: $instanceId)" }
+                emptyList()
+            }
+            val metadataMap = metadataList.associateBy { it.fileKey.toString() }
+            items.map { item ->
+                metadataMap[item.fileKey]?.let { meta ->
+                    item.copy(name = meta.name, artist = meta.artist, album = meta.album)
+                } ?: item
+            }
         } else {
             items
         }
     }
 
-    suspend fun getTracksByKeys(keys: String): Result<List<Track>> = runCatching {
+    suspend fun getTracksByKeys(keys: String): Either<McwsError, List<Track>> = either {
         val params = mapOf(
             "Action" to "JSON",
             "Query" to "[Key]=$keys",
             "Fields" to "Calculated"
         )
-        val responseJson = api.get(baseUrl, "Files/Search", params, token)
-        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
-        
-        val jsonElement = json.parseToJsonElement(responseJson)
-        val itemsArray = if (jsonElement is kotlinx.serialization.json.JsonArray) {
-            jsonElement
-        } else {
-            jsonElement.let { it as? kotlinx.serialization.json.JsonObject }?.get("Item") as? kotlinx.serialization.json.JsonArray
-                ?: emptyList<kotlinx.serialization.json.JsonElement>()
-        }
+        val responseJson = api.get(baseUrl, "Files/Search", params, token).bind()
 
-        itemsArray.map { element ->
-            val obj = element as kotlinx.serialization.json.JsonObject
-            fun getString(key: String): String {
-                val foundKey = obj.keys.find { it.equals(key, ignoreCase = true) }
-                return foundKey?.let { k ->
-                    val el = obj[k]
-                    if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
-                } ?: ""
+        catch({
+            val jsonElement = trackJson.parseToJsonElement(responseJson)
+            val itemsArray = if (jsonElement is kotlinx.serialization.json.JsonArray) {
+                jsonElement
+            } else {
+                jsonElement.let { it as? kotlinx.serialization.json.JsonObject }?.get("Item") as? kotlinx.serialization.json.JsonArray
+                    ?: emptyList<kotlinx.serialization.json.JsonElement>()
             }
-            fun getInt(key: String): Int = getString(key).toIntOrNull() ?: 0
 
-            Track(
-                fileKey = getInt("Key"),
-                name = getString("Name"),
-                artist = getString("Artist"),
-                album = getString("Album"),
-                albumArtist = getString("Album Artist"),
-                albumArtistAuto = getString("Album Artist (auto)"),
-                genre = getString("Genre"),
-                duration = getString("Duration").toDoubleOrNull() ?: 0.0,
-                trackNumber = getInt("Track #"),
-                discNumber = getInt("Disc #"),
-                totalDiscs = getInt("Total Discs"),
-                totalTracks = getInt("Total Tracks"),
-                imageUrl = getString("Image File"),
-                bitrate = getInt("Bitrate"),
-                bitDepth = getInt("Bit Depth"),
-                sampleRate = getInt("Sample Rate"),
-                channels = getInt("Channels"),
-                fileType = getString("File Type"),
-                filePath = getString("Filename"),
-                dateReadable = getString("Date (readable)")
-            )
-        }
+            itemsArray.map { element ->
+                val obj = element as kotlinx.serialization.json.JsonObject
+                fun getString(key: String): String {
+                    val foundKey = obj.keys.find { it.equals(key, ignoreCase = true) }
+                    return foundKey?.let { k ->
+                        val el = obj[k]
+                        if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
+                    } ?: ""
+                }
+                fun getInt(key: String): Int = getString(key).toIntOrNull() ?: 0
+
+                Track(
+                    fileKey = getInt("Key"),
+                    name = getString("Name"),
+                    artist = getString("Artist"),
+                    album = getString("Album"),
+                    albumArtist = getString("Album Artist"),
+                    albumArtistAuto = getString("Album Artist (auto)"),
+                    genre = getString("Genre"),
+                    duration = getString("Duration").toDoubleOrNull() ?: 0.0,
+                    trackNumber = getInt("Track #"),
+                    discNumber = getInt("Disc #"),
+                    totalDiscs = getInt("Total Discs"),
+                    totalTracks = getInt("Total Tracks"),
+                    imageUrl = getString("Image File"),
+                    bitrate = getInt("Bitrate"),
+                    bitDepth = getInt("Bit Depth"),
+                    sampleRate = getInt("Sample Rate"),
+                    channels = getInt("Channels"),
+                    fileType = getString("File Type"),
+                    filePath = getString("Filename"),
+                    dateReadable = getString("Date (readable)")
+                )
+            }
+        }) { t -> raise(McwsError.Parse("getTracksByKeys parse failed: ${t.message}", t)) }
     }
 
-    suspend fun setQueuePosition(zoneId: String, index: Int): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/SetPosition", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Index" to index.toString()), token)
-    }
+    suspend fun setQueuePosition(zoneId: String, index: Int): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/SetPosition", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Index" to index.toString()), token).map { }
 
-    suspend fun reorderQueue(zoneId: String, fromIndex: Int, toIndex: Int): Result<Unit> = runCatching {
+    suspend fun reorderQueue(zoneId: String, fromIndex: Int, toIndex: Int): Either<McwsError, Unit> =
         api.get(baseUrl, "Playback/EditPlaylist", mapOf(
-            "Zone" to zoneId, 
-            "ZoneType" to "ID", 
-            "Action" to "Reorder", 
-            "Index" to fromIndex.toString(), 
+            "Zone" to zoneId,
+            "ZoneType" to "ID",
+            "Action" to "Reorder",
+            "Index" to fromIndex.toString(),
             "To" to toIndex.toString()
-        ), token)
-    }
+        ), token).map { }
 
-    suspend fun removeFromQueue(zoneId: String, index: Int): Result<Unit> = runCatching {
+    suspend fun removeFromQueue(zoneId: String, index: Int): Either<McwsError, Unit> =
         api.get(baseUrl, "Playback/EditPlaylist", mapOf(
-            "Zone" to zoneId, 
-            "ZoneType" to "ID", 
-            "Action" to "Remove", 
+            "Zone" to zoneId,
+            "ZoneType" to "ID",
+            "Action" to "Remove",
             "Index" to index.toString()
-        ), token)
-    }
+        ), token).map { }
 
-    suspend fun linkZones(zoneId: String, targetZoneIds: List<String>): Result<Unit> = runCatching {
+    suspend fun linkZones(zoneId: String, targetZoneIds: List<String>): Either<McwsError, Unit> =
         api.get(baseUrl, "Playback/LinkZones", mapOf(
             "Zone" to zoneId,
             "ZoneType" to "ID",
             "Zones" to targetZoneIds.joinToString(",")
-        ), token)
-    }
+        ), token).map { }
 
-    suspend fun unlinkZone(zoneId: String): Result<Unit> = runCatching {
-        api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
-    }
+    suspend fun unlinkZone(zoneId: String): Either<McwsError, Unit> =
+        api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
 
     fun buildStreamUrl(fileKey: String, conversion: String = "wav", quality: String = "high"): String {
         return URLBuilder("$baseUrl/MCWS/v1/File/GetFile").apply {
@@ -361,43 +357,52 @@ class JRiverMcwsClient(
         }.buildString()
     }
 
-    suspend fun browseChildren(id: String = "-1"): Result<List<BrowseItem>> = runCatching {
-        val params = mapOf(
-            "ID" to id,
-            "Version" to "1"
-        )
-        val responseXml = api.get(baseUrl, "Browse/Children", params, token)
-        val response = xml.decodeFromString(McwsResponse.serializer(), responseXml)
+    suspend fun browseChildren(id: String = "-1"): Either<McwsError, List<BrowseItem>> = either {
+        val params = mapOf("ID" to id, "Version" to "1")
+        val responseXml = api.get(baseUrl, "Browse/Children", params, token).bind()
+        val response = decodeMcwsXml(responseXml).bind()
         response.items.map { BrowseItem(it.value, it.name) }
     }
 
-    suspend fun browseFiles(id: String): Result<List<Track>> = runCatching {
+    suspend fun browseFiles(id: String): Either<McwsError, List<Track>> =
         streamTracks("Browse/Files", mapOf("ID" to id, "Action" to "JSON"))
-    }
 
-    suspend fun searchFiles(query: String, fields: String = "Calculated", limit: Int = -1): Result<List<Track>> = runCatching {
+    suspend fun searchFiles(query: String, fields: String = "Calculated", limit: Int = -1): Either<McwsError, List<Track>> {
         val params = mutableMapOf(
             "Action" to "JSON",
             "Query" to query,
             "Fields" to fields
         )
         if (limit > 0) params["Limit"] = limit.toString()
-        streamTracks("Files/Search", params)
+        return streamTracks("Files/Search", params)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun streamTracks(endpoint: String, params: Map<String, String>): List<Track> {
+    private suspend fun streamTracks(endpoint: String, params: Map<String, String>): Either<McwsError, List<Track>> = either {
         val url = "$baseUrl/MCWS/v1/$endpoint"
-        val response = httpClient.get(url) {
-            params.forEach { (k, v) -> parameter(k, v) }
-            token?.let { parameter("Token", it) }
+        val response = catch({
+            httpClient.get(url) {
+                params.forEach { (k, v) -> parameter(k, v) }
+                token?.let { parameter("Token", it) }
+            }
+        }) { t -> raise(McwsError.Network("GET $url failed: ${t.message}", t)) }
+
+        ensure(response.status.isSuccess()) {
+            McwsError.HttpStatus(response.status.value, "MCWS $endpoint -> ${response.status}")
         }
-        if (!response.status.isSuccess()) {
-            throw Exception("MCWS request failed: ${response.status}")
+
+        val dtos = catch({
+            val source = response.bodyAsChannel().readBuffer()
+            trackJson.decodeFromSource<List<TrackDto>>(source)
+        }) { t -> raise(McwsError.Parse("Streaming decode of $endpoint failed: ${t.message}", t)) }
+
+        dtos.map { it.toTrack() }
+    }
+
+    private fun decodeMcwsXml(responseXml: String): Either<McwsError, McwsResponse> = either {
+        catch({ xml.decodeFromString(McwsResponse.serializer(), responseXml) }) { t ->
+            raise(McwsError.Parse("MCWS XML decode failed: ${t.message}", t))
         }
-        val source = response.bodyAsChannel().readBuffer()
-        val dtos = trackJson.decodeFromSource<List<TrackDto>>(source)
-        return dtos.map { it.toTrack() }
     }
 }
 

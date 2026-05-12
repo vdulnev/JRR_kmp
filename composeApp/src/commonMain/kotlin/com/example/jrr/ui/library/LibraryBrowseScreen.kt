@@ -35,7 +35,7 @@ fun LibraryBrowseScreen(
             }
         } else if (uiState.error != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(uiState.error!!, color = MaterialTheme.colorScheme.error)
+                Text(uiState.error!!.message, color = MaterialTheme.colorScheme.error)
             }
         } else {
             Column(modifier = Modifier.fillMaxSize()) {

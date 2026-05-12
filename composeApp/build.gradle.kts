@@ -75,6 +75,11 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.koin.annotations)
             implementation(libs.kermit)
+
+            // Arrow
+            implementation(libs.arrow.core)
+            implementation(libs.arrow.fx.coroutines)
+            implementation(libs.arrow.resilience)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

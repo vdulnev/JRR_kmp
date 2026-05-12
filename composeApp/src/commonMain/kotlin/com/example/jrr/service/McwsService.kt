@@ -1,11 +1,14 @@
 package com.example.jrr.service
 
+import arrow.core.Either
+import arrow.resilience.Schedule
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
 import com.example.jrr.domain.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.koin.core.annotation.Single
+import kotlin.time.Duration.Companion.seconds
 
 @Single
 class McwsService(
@@ -80,43 +83,19 @@ class McwsService(
     }
     fun unlinkZone(zoneId: String) = scope.launch { mcwsClient.unlinkZone(zoneId).logFailure("unlinkZone") }
 
-    suspend fun browseChildren(id: String = "-1"): List<BrowseItem> {
-        return mcwsClient.browseChildren(id).fold(
-            onSuccess = { it },
-            onFailure = {
-                logger.e { "Failed to browse children for ID $id: ${it.message}" }
-                emptyList()
-            }
-        )
-    }
+    suspend fun browseChildren(id: String = "-1"): Either<McwsError, List<BrowseItem>> =
+        mcwsClient.browseChildren(id).onLeft { logger.e { "browseChildren($id): ${it.message}" } }
 
-    suspend fun browseFiles(id: String): List<Track> {
-        return mcwsClient.browseFiles(id).fold(
-            onSuccess = { it },
-            onFailure = {
-                logger.e { "Failed to browse files for ID $id: ${it.message}" }
-                emptyList()
-            }
-        )
-    }
+    suspend fun browseFiles(id: String): Either<McwsError, List<Track>> =
+        mcwsClient.browseFiles(id).onLeft { logger.e { "browseFiles($id): ${it.message}" } }
 
-    suspend fun search(query: String, limit: Int = -1): List<Track> {
-        return mcwsClient.searchFiles(query, limit = limit).fold(
-            onSuccess = { it },
-            onFailure = {
-                logger.e { "Failed to search for '$query': ${it.message}" }
-                emptyList()
-            }
-        )
-    }
+    suspend fun search(query: String, limit: Int = -1): Either<McwsError, List<Track>> =
+        mcwsClient.searchFiles(query, limit = limit).onLeft { logger.e { "search($query): ${it.message}" } }
 
     private fun startZonesPolling() {
         zonesPollingJob?.cancel()
         zonesPollingJob = scope.launch {
-            while (isActive) {
-                pollZones()
-                delay(30000L)
-            }
+            Schedule.spaced<Unit>(30.seconds).repeat { pollZones() }
         }
     }
 
@@ -126,9 +105,8 @@ class McwsService(
             while (isActive) {
                 pollPlaybackInfo()
                 val interval = when (_playerStatus.value?.state) {
-                    PlaybackState.PLAYING -> 1000L
-                    PlaybackState.PAUSED, PlaybackState.STOPPED -> 5000L
-                    else -> 5000L
+                    PlaybackState.PLAYING -> 1.seconds
+                    else -> 5.seconds
                 }
                 delay(interval)
             }
@@ -142,49 +120,33 @@ class McwsService(
 
     private suspend fun pollZones() {
         logger.v { "Polling zones..." }
-        mcwsClient.getZones().fold(
-            onSuccess = { zonesFromServer ->
-                logger.d { "Successfully polled ${zonesFromServer.size} zones from server" }
-                _zones.value = zonesFromServer
-            },
-            onFailure = {
-                logger.w { "Failed to poll zones: ${it.message}" }
-                _zones.value = emptyList()
-            }
-        )
+        mcwsClient.getZones()
+            .onRight { _zones.value = it; logger.d { "Polled ${it.size} zones" } }
+            .onLeft { logger.w { "Failed to poll zones: ${it.message}" }; _zones.value = emptyList() }
     }
 
     private suspend fun pollPlaybackInfo() {
         val zoneId = activeZoneId ?: return
-        mcwsClient.getPlaybackInfo(zoneId).fold(
-            onSuccess = { status ->
+        mcwsClient.getPlaybackInfo(zoneId)
+            .onRight { status ->
                 _playerStatus.value = status
                 if (status.playingNowChangeCounter != lastChangeCounter) {
-                    logger.d { "Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks in server info: ${status.playingNowTracks}. Fetching queue." }
+                    logger.d { "Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks: ${status.playingNowTracks}. Fetching queue." }
                     lastChangeCounter = status.playingNowChangeCounter
                     fetchQueue(status.zoneId)
                 }
-            },
-            onFailure = {
-                logger.w { "Failed to poll playback info: ${it.message}" }
             }
-        )
+            .onLeft { logger.w { "Failed to poll playback info: ${it.message}" } }
     }
 
     private suspend fun fetchQueue(zoneId: String) {
         logger.d { "Fetching queue for zone $zoneId" }
-        mcwsClient.getPlayingNow(zoneId).fold(
-            onSuccess = {
-                logger.d { "Successfully fetched queue (${it.size} items)" }
-                _currentQueue.value = it
-            },
-            onFailure = {
-                logger.e(it) { "Failed to fetch queue: ${it.message}" }
-            }
-        )
+        mcwsClient.getPlayingNow(zoneId)
+            .onRight { _currentQueue.value = it; logger.d { "Fetched queue (${it.size} items)" } }
+            .onLeft { logger.e { "Failed to fetch queue: ${it.message}" } }
     }
 
-    private fun Result<Unit>.logFailure(command: String) {
-        onFailure { logger.w { "MCWS command '$command' failed: ${it.message}" } }
+    private fun Either<McwsError, Unit>.logFailure(command: String) {
+        onLeft { logger.w { "MCWS command '$command' failed: ${it.message}" } }
     }
 }

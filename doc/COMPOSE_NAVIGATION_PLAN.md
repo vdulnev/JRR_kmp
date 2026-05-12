@@ -4,7 +4,9 @@ Date: 2026-05-12
 
 ## Goal
 
-Replace the current manual screen state in `App.kt` and `NowPlayingContainer.kt` with official Compose Multiplatform Navigation while keeping the existing Koin ViewModels and service layer intact.
+Replace the current manual screen state in `App.kt` and `NowPlayingContainer.kt` with official
+Compose Multiplatform Navigation while keeping the existing Koin ViewModels and service layer
+intact.
 
 Recommended dependency:
 
@@ -21,9 +23,11 @@ androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navi
 ## Current State
 
 - `App.kt` uses `currentScreen: Screen` and a `when` statement for `Setup` vs `Player`.
-- `NowPlayingContainer.kt` uses `selectedTab: PlayerTab` and a `when` statement for bottom navigation tabs.
+- `NowPlayingContainer.kt` uses `selectedTab: PlayerTab` and a `when` statement for bottom
+  navigation tabs.
 - ViewModels are resolved inside composables with `koinViewModel()`.
-- `JRiverService` already acts as a UI-facing coordinator, so navigation should not change service responsibilities.
+- `JRiverService` already acts as a UI-facing coordinator, so navigation should not change service
+  responsibilities.
 
 ## Target Navigation Shape
 
@@ -46,7 +50,8 @@ Player tab routes:
 @Serializable data object SettingsRoute
 ```
 
-Keep the player tabs as nested navigation under `PlayerRoute`. This gives back stack behavior for tab content and removes duplicated manual tab state.
+Keep the player tabs as nested navigation under `PlayerRoute`. This gives back stack behavior for
+tab content and removes duplicated manual tab state.
 
 ## Files To Add
 
@@ -128,7 +133,8 @@ Remove the `PlayerTab` enum after route-based tabs are working.
 
 ### Setup To Player
 
-Setup should not directly navigate on button click. Keep the current source of truth: settings/session state.
+Setup should not directly navigate on button click. Keep the current source of truth:
+settings/session state.
 
 Flow:
 
@@ -186,9 +192,9 @@ Status: completed.
 2. Replace `currentScreen` in `App.kt`.
 3. Keep setup/player screen behavior identical.
 4. Validate:
-   - first launch with no server shows setup
-   - authenticated session shows player
-   - logout returns to setup
+    - first launch with no server shows setup
+    - authenticated session shows player
+    - logout returns to setup
 
 ### Phase 3: Player Tab Navigation
 
@@ -198,9 +204,9 @@ Status: completed.
 2. Refactor `NowPlayingContainer` bottom bar to route-based navigation.
 3. Keep existing tab UI and icons.
 4. Validate:
-   - each tab opens correctly
-   - tab selection tracks current destination
-   - settings back action navigates to now playing
+    - each tab opens correctly
+    - tab selection tracks current destination
+    - settings back action navigates to now playing
 
 ### Phase 4: Cleanup
 
@@ -214,9 +220,13 @@ Status: completed.
 ## Risks And Notes
 
 - Do not let `SetupScreen` own navigation. Session state should remain the trigger.
-- Do not move service startup into destination composables. `App.kt` should remain responsible for configuring `JRiverMcwsClient` and starting/stopping `JRiverService`.
-- Avoid passing `JRiverService` through navigation if not needed. ViewModels already receive dependencies through Koin.
-- Bottom tab back behavior needs a product decision. Recommended initial behavior: tab switches should not build a deep history; system back from player should exit/minimize on Android rather than walk through every tab.
+- Do not move service startup into destination composables. `App.kt` should remain responsible for
+  configuring `JRiverMcwsClient` and starting/stopping `JRiverService`.
+- Avoid passing `JRiverService` through navigation if not needed. ViewModels already receive
+  dependencies through Koin.
+- Bottom tab back behavior needs a product decision. Recommended initial behavior: tab switches
+  should not build a deep history; system back from player should exit/minimize on Android rather
+  than walk through every tab.
 
 ## Validation Checklist
 
@@ -233,5 +243,7 @@ Status: completed.
 - Top-level and player-tab routes use typed `@Serializable` route objects.
 - `AppNavHost` owns setup/player navigation and reacts to session state.
 - `PlayerNavHost` owns nested player destinations.
-- `NowPlayingContainer` owns the nested player `NavHostController` and derives selected tab state from the active destination.
-- The bottom bar uses a small custom tab item inside `NavigationBar`; `NavigationBarItem` was not available from the resolved Material3 artifact after adding navigation.
+- `NowPlayingContainer` owns the nested player `NavHostController` and derives selected tab state
+  from the active destination.
+- The bottom bar uses a small custom tab item inside `NavigationBar`; `NavigationBarItem` was not
+  available from the resolved Material3 artifact after adding navigation.

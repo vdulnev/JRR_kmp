@@ -2,6 +2,8 @@ package com.example.jrr.player
 
 import co.touchlab.kermit.Logger
 import com.example.jrr.domain.model.PlaybackState
+import kotlinx.cinterop.CValue
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -10,10 +12,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import platform.AVFoundation.*
-import platform.CoreMedia.*
-import platform.Foundation.*
-import kotlinx.cinterop.*
+import platform.AVFoundation.AVPlayer
+import platform.AVFoundation.AVPlayerItem
+import platform.AVFoundation.AVPlayerTimeControlStatusPlaying
+import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRate
+import platform.AVFoundation.currentItem
+import platform.AVFoundation.currentTime
+import platform.AVFoundation.duration
+import platform.AVFoundation.pause
+import platform.AVFoundation.play
+import platform.AVFoundation.rate
+import platform.AVFoundation.replaceCurrentItemWithPlayerItem
+import platform.AVFoundation.seekToTime
+import platform.AVFoundation.timeControlStatus
+import platform.AVFoundation.volume
+import platform.CoreMedia.CMTime
+import platform.CoreMedia.CMTimeMake
+import platform.Foundation.NSURL
 
 @OptIn(ExperimentalForeignApi::class)
 class IosLocalPlayer : LocalPlayer {
@@ -42,7 +57,7 @@ class IosLocalPlayer : LocalPlayer {
                     if (CMTIME_IS_VALID(time)) {
                         _currentPositionMs.value = (CMTimeGetSeconds(time) * 1000).toInt()
                     }
-                    
+
                     val duration = p.currentItem?.duration()
                     if (duration != null && CMTIME_IS_VALID(duration)) {
                         _durationMs.value = (CMTimeGetSeconds(duration) * 1000).toInt()
@@ -112,7 +127,8 @@ actual fun createLocalPlayer(context: Any?): LocalPlayer {
 
 // Helper functions for CMTime (simplified for KMP/Native)
 @OptIn(ExperimentalForeignApi::class)
-private fun CMTIME_IS_VALID(time: CValue<CMTime>): Boolean = true // Mock for now, requires deeper cinterop for exact check
+private fun CMTIME_IS_VALID(time: CValue<CMTime>): Boolean =
+    true // Mock for now, requires deeper cinterop for exact check
 
 @OptIn(ExperimentalForeignApi::class)
 private fun CMTimeGetSeconds(time: CValue<CMTime>): Double = 0.0 // Mock for now

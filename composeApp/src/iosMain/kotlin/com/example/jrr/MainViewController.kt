@@ -8,7 +8,7 @@ import com.example.jrr.ui.theme.ObsidianTheme
 
 fun MainViewController() = ComposeUIViewController {
     val dataStore = remember { createDataStore() }
-    
+
     remember {
         initKoin(dataStore)
     }

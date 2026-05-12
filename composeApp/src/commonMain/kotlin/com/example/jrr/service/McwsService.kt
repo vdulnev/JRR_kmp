@@ -4,9 +4,23 @@ import arrow.core.Either
 import arrow.resilience.Schedule
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
-import com.example.jrr.domain.model.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import com.example.jrr.domain.model.BrowseItem
+import com.example.jrr.domain.model.McwsError
+import com.example.jrr.domain.model.PlaybackState
+import com.example.jrr.domain.model.PlayerStatus
+import com.example.jrr.domain.model.PlayingNowItem
+import com.example.jrr.domain.model.Track
+import com.example.jrr.domain.model.Zone
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.koin.core.annotation.Single
 import kotlin.time.Duration.Companion.seconds
 
@@ -61,27 +75,41 @@ class McwsService(
 
     fun play(zoneId: String) = scope.launch { mcwsClient.play(zoneId).logFailure("play") }
     fun pause(zoneId: String) = scope.launch { mcwsClient.pause(zoneId).logFailure("pause") }
-    fun playPause(zoneId: String) = scope.launch { mcwsClient.playPause(zoneId).logFailure("playPause") }
+    fun playPause(zoneId: String) =
+        scope.launch { mcwsClient.playPause(zoneId).logFailure("playPause") }
+
     fun next(zoneId: String) = scope.launch { mcwsClient.next(zoneId).logFailure("next") }
-    fun previous(zoneId: String) = scope.launch { mcwsClient.previous(zoneId).logFailure("previous") }
-    fun setVolume(zoneId: String, level: Float) = scope.launch { mcwsClient.setVolume(zoneId, level).logFailure("setVolume") }
-    fun seek(zoneId: String, positionMs: Int) = scope.launch { mcwsClient.seek(zoneId, positionMs).logFailure("seek") }
+    fun previous(zoneId: String) =
+        scope.launch { mcwsClient.previous(zoneId).logFailure("previous") }
+
+    fun setVolume(zoneId: String, level: Float) =
+        scope.launch { mcwsClient.setVolume(zoneId, level).logFailure("setVolume") }
+
+    fun seek(zoneId: String, positionMs: Int) =
+        scope.launch { mcwsClient.seek(zoneId, positionMs).logFailure("seek") }
+
     fun playTrack(zoneId: String, track: Track) = scope.launch {
         mcwsClient.playByKey(zoneId, track.fileKey.toString()).logFailure("playByKey")
     }
+
     fun setQueuePosition(zoneId: String, index: Int) = scope.launch {
         mcwsClient.setQueuePosition(zoneId, index).logFailure("setQueuePosition")
     }
+
     fun reorderQueue(zoneId: String, from: Int, to: Int) = scope.launch {
         mcwsClient.reorderQueue(zoneId, from, to).logFailure("reorderQueue")
     }
+
     fun removeFromQueue(zoneId: String, index: Int) = scope.launch {
         mcwsClient.removeFromQueue(zoneId, index).logFailure("removeFromQueue")
     }
+
     fun linkZones(zoneId: String, targetZoneIds: List<String>) = scope.launch {
         mcwsClient.linkZones(zoneId, targetZoneIds).logFailure("linkZones")
     }
-    fun unlinkZone(zoneId: String) = scope.launch { mcwsClient.unlinkZone(zoneId).logFailure("unlinkZone") }
+
+    fun unlinkZone(zoneId: String) =
+        scope.launch { mcwsClient.unlinkZone(zoneId).logFailure("unlinkZone") }
 
     suspend fun browseChildren(id: String = "-1"): Either<McwsError, List<BrowseItem>> =
         mcwsClient.browseChildren(id).onLeft { logger.e { "browseChildren($id): ${it.message}" } }
@@ -90,7 +118,8 @@ class McwsService(
         mcwsClient.browseFiles(id).onLeft { logger.e { "browseFiles($id): ${it.message}" } }
 
     suspend fun search(query: String, limit: Int = -1): Either<McwsError, List<Track>> =
-        mcwsClient.searchFiles(query, limit = limit).onLeft { logger.e { "search($query): ${it.message}" } }
+        mcwsClient.searchFiles(query, limit = limit)
+            .onLeft { logger.e { "search($query): ${it.message}" } }
 
     private fun startZonesPolling() {
         zonesPollingJob?.cancel()
@@ -122,7 +151,9 @@ class McwsService(
         logger.v { "Polling zones..." }
         mcwsClient.getZones()
             .onRight { _zones.value = it; logger.d { "Polled ${it.size} zones" } }
-            .onLeft { logger.w { "Failed to poll zones: ${it.message}" }; _zones.value = emptyList() }
+            .onLeft {
+                logger.w { "Failed to poll zones: ${it.message}" }; _zones.value = emptyList()
+            }
     }
 
     private suspend fun pollPlaybackInfo() {

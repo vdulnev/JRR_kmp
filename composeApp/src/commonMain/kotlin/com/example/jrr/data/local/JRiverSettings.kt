@@ -1,13 +1,17 @@
 package com.example.jrr.data.local
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.jrr.domain.model.SavedServer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import org.koin.core.annotation.Single
-
 import kotlinx.serialization.json.Json
-import com.example.jrr.domain.model.SavedServer
+import org.koin.core.annotation.Single
 
 @Single
 class JRiverSettings(
@@ -79,10 +83,10 @@ class JRiverSettings(
             } catch (e: Exception) {
                 emptyList()
             }
-            
+
             val updated = (listOf(server) + current.filter { it.address != server.address })
                 .take(5)
-            
+
             prefs[Keys.RECENT_SERVERS] = Json.encodeToString(updated)
         }
     }

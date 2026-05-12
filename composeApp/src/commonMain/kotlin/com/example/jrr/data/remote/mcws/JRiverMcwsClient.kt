@@ -7,13 +7,27 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import co.touchlab.kermit.Logger
-import com.example.jrr.domain.model.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.util.*
+import com.example.jrr.domain.model.BrowseItem
+import com.example.jrr.domain.model.McwsError
+import com.example.jrr.domain.model.PlaybackState
+import com.example.jrr.domain.model.PlayerStatus
+import com.example.jrr.domain.model.PlayingNowItem
+import com.example.jrr.domain.model.RepeatMode
+import com.example.jrr.domain.model.ServerInfo
+import com.example.jrr.domain.model.ShuffleMode
+import com.example.jrr.domain.model.Track
+import com.example.jrr.domain.model.TrackInfo
+import com.example.jrr.domain.model.Zone
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
+import io.ktor.http.URLBuilder
+import io.ktor.http.isSuccess
+import io.ktor.util.encodeBase64
 import io.ktor.utils.io.readBuffer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -40,7 +54,13 @@ class JRiverMcwsClient(
     }
 
     fun updateConfig(baseUrl: String, token: String?) {
-        logger.i { "Updating config - instanceId: $instanceId, baseUrl: $baseUrl, token: ${token?.take(5)}..." }
+        logger.i {
+            "Updating config - instanceId: $instanceId, baseUrl: $baseUrl, token: ${
+                token?.take(
+                    5
+                )
+            }..."
+        }
         this.baseUrl = baseUrl
         this.token = token
     }
@@ -60,7 +80,11 @@ class JRiverMcwsClient(
         )
     }
 
-    suspend fun authenticate(hostAddress: String, username: String, password: String): Either<McwsError, String> = either {
+    suspend fun authenticate(
+        hostAddress: String,
+        username: String,
+        password: String
+    ): Either<McwsError, String> = either {
         logger.d { "Calling Authenticate on $hostAddress (instanceId: $instanceId)" }
         val authHeader = "Basic ${"$username:$password".encodeBase64()}"
         val response = catch({
@@ -137,33 +161,54 @@ class JRiverMcwsClient(
 
     // Transport Commands
     suspend fun play(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Play", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/Play", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun pause(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Pause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/Pause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun playPause(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/PlayPause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/PlayPause", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun stop(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Stop", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/Stop", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun next(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Next", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/Next", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun previous(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Previous", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/Previous", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
     suspend fun playByKey(zoneId: String, key: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/PlayByKey", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Key" to key), token).map { }
+        api.get(
+            baseUrl,
+            "Playback/PlayByKey",
+            mapOf("Zone" to zoneId, "ZoneType" to "ID", "Key" to key),
+            token
+        ).map { }
 
     suspend fun setVolume(zoneId: String, level: Float): Either<McwsError, Unit> {
         val mcwsLevel = (level * 100).toInt().coerceIn(0, 100)
-        return api.get(baseUrl, "Playback/Volume", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Level" to mcwsLevel.toString()), token).map { }
+        return api.get(
+            baseUrl,
+            "Playback/Volume",
+            mapOf("Zone" to zoneId, "ZoneType" to "ID", "Level" to mcwsLevel.toString()),
+            token
+        ).map { }
     }
 
     suspend fun seek(zoneId: String, positionMs: Int): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/Position", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Position" to positionMs.toString()), token).map { }
+        api.get(
+            baseUrl,
+            "Playback/Position",
+            mapOf("Zone" to zoneId, "ZoneType" to "ID", "Position" to positionMs.toString()),
+            token
+        ).map { }
 
     suspend fun getZones(): Either<McwsError, List<Zone>> = either {
         ensure(baseUrl.isNotBlank()) {
@@ -211,6 +256,7 @@ class JRiverMcwsClient(
                     val target = response ?: jsonElement
                     target["Item"] as? kotlinx.serialization.json.JsonArray
                 }
+
                 else -> null
             }
         }) { t -> raise(McwsError.Parse("Playlist JSON parse failed: ${t.message}", t)) }
@@ -272,7 +318,8 @@ class JRiverMcwsClient(
         catch({
             val jsonElement = trackJson.parseToJsonElement(responseJson)
             val itemsArray = jsonElement as? kotlinx.serialization.json.JsonArray
-                ?: (jsonElement.let { it as? kotlinx.serialization.json.JsonObject }?.get("Item") as? kotlinx.serialization.json.JsonArray
+                ?: (jsonElement.let { it as? kotlinx.serialization.json.JsonObject }
+                    ?.get("Item") as? kotlinx.serialization.json.JsonArray
                     ?: emptyList<kotlinx.serialization.json.JsonElement>())
 
             itemsArray.map { element ->
@@ -284,6 +331,7 @@ class JRiverMcwsClient(
                         if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
                     } ?: ""
                 }
+
                 fun getInt(key: String): Int = getString(key).toIntOrNull() ?: 0
 
                 Track(
@@ -313,36 +361,56 @@ class JRiverMcwsClient(
     }
 
     suspend fun setQueuePosition(zoneId: String, index: Int): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/SetPosition", mapOf("Zone" to zoneId, "ZoneType" to "ID", "Index" to index.toString()), token).map { }
+        api.get(
+            baseUrl,
+            "Playback/SetPosition",
+            mapOf("Zone" to zoneId, "ZoneType" to "ID", "Index" to index.toString()),
+            token
+        ).map { }
 
-    suspend fun reorderQueue(zoneId: String, fromIndex: Int, toIndex: Int): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/EditPlaylist", mapOf(
-            "Zone" to zoneId,
-            "ZoneType" to "ID",
-            "Action" to "Reorder",
-            "Index" to fromIndex.toString(),
-            "To" to toIndex.toString()
-        ), token).map { }
+    suspend fun reorderQueue(
+        zoneId: String,
+        fromIndex: Int,
+        toIndex: Int
+    ): Either<McwsError, Unit> =
+        api.get(
+            baseUrl, "Playback/EditPlaylist", mapOf(
+                "Zone" to zoneId,
+                "ZoneType" to "ID",
+                "Action" to "Reorder",
+                "Index" to fromIndex.toString(),
+                "To" to toIndex.toString()
+            ), token
+        ).map { }
 
     suspend fun removeFromQueue(zoneId: String, index: Int): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/EditPlaylist", mapOf(
-            "Zone" to zoneId,
-            "ZoneType" to "ID",
-            "Action" to "Remove",
-            "Index" to index.toString()
-        ), token).map { }
+        api.get(
+            baseUrl, "Playback/EditPlaylist", mapOf(
+                "Zone" to zoneId,
+                "ZoneType" to "ID",
+                "Action" to "Remove",
+                "Index" to index.toString()
+            ), token
+        ).map { }
 
     suspend fun linkZones(zoneId: String, targetZoneIds: List<String>): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/LinkZones", mapOf(
-            "Zone" to zoneId,
-            "ZoneType" to "ID",
-            "Zones" to targetZoneIds.joinToString(",")
-        ), token).map { }
+        api.get(
+            baseUrl, "Playback/LinkZones", mapOf(
+                "Zone" to zoneId,
+                "ZoneType" to "ID",
+                "Zones" to targetZoneIds.joinToString(",")
+            ), token
+        ).map { }
 
     suspend fun unlinkZone(zoneId: String): Either<McwsError, Unit> =
-        api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token).map { }
+        api.get(baseUrl, "Playback/UnlinkZone", mapOf("Zone" to zoneId, "ZoneType" to "ID"), token)
+            .map { }
 
-    fun buildStreamUrl(fileKey: String, conversion: String = "wav", quality: String = "high"): String {
+    fun buildStreamUrl(
+        fileKey: String,
+        conversion: String = "wav",
+        quality: String = "high"
+    ): String {
         return URLBuilder("$baseUrl/MCWS/v1/File/GetFile").apply {
             parameters.append("File", fileKey)
             parameters.append("FileType", "Key")
@@ -363,7 +431,11 @@ class JRiverMcwsClient(
     suspend fun browseFiles(id: String): Either<McwsError, List<Track>> =
         streamTracks("Browse/Files", mapOf("ID" to id, "Action" to "JSON"))
 
-    suspend fun searchFiles(query: String, fields: String = "Calculated", limit: Int = -1): Either<McwsError, List<Track>> {
+    suspend fun searchFiles(
+        query: String,
+        fields: String = "Calculated",
+        limit: Int = -1
+    ): Either<McwsError, List<Track>> {
         val params = mutableMapOf(
             "Action" to "JSON",
             "Query" to query,
@@ -374,7 +446,10 @@ class JRiverMcwsClient(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun streamTracks(endpoint: String, params: Map<String, String>): Either<McwsError, List<Track>> = either {
+    private suspend fun streamTracks(
+        endpoint: String,
+        params: Map<String, String>
+    ): Either<McwsError, List<Track>> = either {
         val url = "$baseUrl/MCWS/v1/$endpoint"
         val response = catch({
             httpClient.get(url) {

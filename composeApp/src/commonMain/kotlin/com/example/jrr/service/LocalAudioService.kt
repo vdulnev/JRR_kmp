@@ -2,10 +2,22 @@ package com.example.jrr.service
 
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.remote.mcws.JRiverMcwsClient
-import com.example.jrr.domain.model.*
+import com.example.jrr.domain.model.PlaybackState
+import com.example.jrr.domain.model.PlayerStatus
+import com.example.jrr.domain.model.RepeatMode
+import com.example.jrr.domain.model.ShuffleMode
+import com.example.jrr.domain.model.Track
+import com.example.jrr.domain.model.TrackInfo
+import com.example.jrr.domain.model.Zone
 import com.example.jrr.player.LocalPlayer
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.koin.core.annotation.Single
 
 @Single
@@ -16,7 +28,13 @@ class LocalAudioService(
     private val logger = Logger.withTag("LocalAudioService")
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    val zone = Zone(id = LOCAL_ZONE_ID, name = "This Device", guid = LOCAL_ZONE_GUID, isDLNA = false, isLocal = true)
+    val zone = Zone(
+        id = LOCAL_ZONE_ID,
+        name = "This Device",
+        guid = LOCAL_ZONE_GUID,
+        isDLNA = false,
+        isLocal = true
+    )
 
     private val _playerStatus = MutableStateFlow(createStatus(null))
     val playerStatus: StateFlow<PlayerStatus> = _playerStatus.asStateFlow()

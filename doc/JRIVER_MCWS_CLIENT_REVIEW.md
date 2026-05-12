@@ -21,11 +21,16 @@ Files:
 - `composeApp/src/commonMain/kotlin/com/example/jrr/ui/setup/SetupViewModel.kt`
 - `composeApp/src/commonMain/kotlin/com/example/jrr/data/local/JRiverSettings.kt`
 
-`SetupViewModel.authenticateAndSave()` saves `serverAddress` before `authToken`. `App` observes both values and starts `JRiverService` as soon as `serverAddress` is non-blank, so it can configure `JRiverMcwsClient` with `authToken == null`.
+`SetupViewModel.authenticateAndSave()` saves `serverAddress` before `authToken`. `App` observes both
+values and starts `JRiverService` as soon as `serverAddress` is non-blank, so it can configure
+`JRiverMcwsClient` with `authToken == null`.
 
-Impact: auth-required servers may receive unauthenticated polling requests, then the service starts again once the token arrives.
+Impact: auth-required servers may receive unauthenticated polling requests, then the service starts
+again once the token arrives.
 
-Resolution: authenticated server details and token are now persisted in one DataStore edit, and `App` observes address/token through a combined flow so startup waits until both persisted values have loaded.
+Resolution: authenticated server details and token are now persisted in one DataStore edit, and
+`App` observes address/token through a combined flow so startup waits until both persisted values
+have loaded.
 
 ### High: `JRiverService.start()` is not idempotent
 
@@ -35,11 +40,17 @@ File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/service/JRiverService.kt`
 
-`start()` cancels/replaces playback and zone polling jobs, but it launches two `localPlayer` collectors every time and never cancels them in `stop()`.
+`start()` cancels/replaces playback and zone polling jobs, but it launches two `localPlayer`
+collectors every time and never cancels them in `stop()`.
 
-Impact: re-login, token refresh, or repeated startup can accumulate collectors and duplicate local status updates.
+Impact: re-login, token refresh, or repeated startup can accumulate collectors and duplicate local
+status updates.
 
-Resolution: `JRiverService` is now a coordinator over two backend services. `McwsService` owns remote zones, MCWS playback polling, remote queue state, library browsing, and remote commands. `LocalAudioService` owns local player observation and local playback commands. This keeps remote polling and local observers in separate lifecycles while preserving the existing UI-facing `JRiverService` API.
+Resolution: `JRiverService` is now a coordinator over two backend services. `McwsService` owns
+remote zones, MCWS playback polling, remote queue state, library browsing, and remote commands.
+`LocalAudioService` owns local player observation and local playback commands. This keeps remote
+polling and local observers in separate lifecycles while preserving the existing UI-facing
+`JRiverService` API.
 
 ### Medium: local `next()` and `previous()` route to MCWS
 
@@ -49,11 +60,15 @@ File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/service/JRiverService.kt`
 
-Most transport methods special-case `activeZoneId == "local"`, but `next()` and `previous()` always call MCWS with the current zone ID.
+Most transport methods special-case `activeZoneId == "local"`, but `next()` and `previous()` always
+call MCWS with the current zone ID.
 
-Impact: when the local zone is active, these commands send `Zone=local` to MCWS and should fail or hit the wrong control path.
+Impact: when the local zone is active, these commands send `Zone=local` to MCWS and should fail or
+hit the wrong control path.
 
-Resolution: `next()` and `previous()` now use remote-only command routing. When the local zone is active, the coordinator logs and ignores those MCWS-only commands instead of sending `Zone=local` to MCWS.
+Resolution: `next()` and `previous()` now use remote-only command routing. When the local zone is
+active, the coordinator logs and ignores those MCWS-only commands instead of sending `Zone=local` to
+MCWS.
 
 ### Medium: stream URL construction is unsafe
 
@@ -63,11 +78,14 @@ File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/data/remote/mcws/JRiverMcwsClient.kt`
 
-`buildStreamUrl()` interpolates query parameters directly and always appends `Token=$token`, including `Token=null`.
+`buildStreamUrl()` interpolates query parameters directly and always appends `Token=$token`,
+including `Token=null`.
 
-Impact: local playback can break after the startup token race or when token/conversion/quality values contain reserved URL characters.
+Impact: local playback can break after the startup token race or when token/conversion/quality
+values contain reserved URL characters.
 
-Resolution: `buildStreamUrl()` now uses Ktor `URLBuilder` query parameters and only appends `Token` when the token is non-blank.
+Resolution: `buildStreamUrl()` now uses Ktor `URLBuilder` query parameters and only appends `Token`
+when the token is non-blank.
 
 ### Medium: MCWS JSON parsing misses single-item responses
 
@@ -75,9 +93,11 @@ File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/data/remote/mcws/JRiverMcwsClient.kt`
 
-`getPlayingNow()`, `getTracksByKeys()`, and `parseTrackList()` only accept `Item` when it is a JSON array.
+`getPlayingNow()`, `getTracksByKeys()`, and `parseTrackList()` only accept `Item` when it is a JSON
+array.
 
-Impact: if MCWS returns a single `Item` object for one playlist/search result, queue parsing fails or metadata silently comes back empty.
+Impact: if MCWS returns a single `Item` object for one playlist/search result, queue parsing fails
+or metadata silently comes back empty.
 
 Suggested fix: normalize `Item` into a list for both object and array shapes.
 
@@ -89,9 +109,11 @@ File:
 
 Most transport and queue commands ignore returned `Result` values.
 
-Impact: failures from play/pause/seek/queue edits are not surfaced to the UI, and many are not logged.
+Impact: failures from play/pause/seek/queue edits are not surfaced to the UI, and many are not
+logged.
 
-Suggested fix: consistently log failed command results and consider exposing transient command errors in UI state.
+Suggested fix: consistently log failed command results and consider exposing transient command
+errors in UI state.
 
 ## Validation
 
@@ -103,4 +125,5 @@ Command run:
 
 Result: build successful.
 
-Note: the first Gradle attempt was blocked by sandbox access to `~/.gradle`; it passed after allowing Gradle wrapper cache access.
+Note: the first Gradle attempt was blocked by sandbox access to `~/.gradle`; it passed after
+allowing Gradle wrapper cache access.

@@ -1,13 +1,28 @@
 package com.example.jrr.ui.library
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,7 +56,9 @@ fun LibraryBrowseScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 if (uiState.searchQuery.isNotBlank() && uiState.searchResults.isNotEmpty()) {
                     TechnicalLabel(text = "Search Results", modifier = Modifier.padding(16.dp))
-                    TrackList(tracks = uiState.searchResults, onItemClick = { viewModel.playTrack(it) })
+                    TrackList(
+                        tracks = uiState.searchResults,
+                        onItemClick = { viewModel.playTrack(it) })
                 } else if (uiState.tracks.isNotEmpty()) {
                     TrackList(tracks = uiState.tracks, onItemClick = { viewModel.playTrack(it) })
                 } else {
@@ -49,10 +66,24 @@ fun LibraryBrowseScreen(
                         items(uiState.children) { item ->
                             ListItem(
                                 headlineContent = { Text(item.name) },
-                                trailingContent = { Icon(Icons.Default.ChevronRight, contentDescription = null) },
-                                modifier = Modifier.clickable { viewModel.browse(item.id, item.name) }
+                                trailingContent = {
+                                    Icon(
+                                        Icons.Default.ChevronRight,
+                                        contentDescription = null
+                                    )
+                                },
+                                modifier = Modifier.clickable {
+                                    viewModel.browse(
+                                        item.id,
+                                        item.name
+                                    )
+                                }
                             )
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
                         }
                     }
                 }
@@ -102,13 +133,26 @@ fun TrackList(
         items(tracks) { track ->
             ListItem(
                 headlineContent = { Text(track.name) },
-                supportingContent = { Text("${track.artist} — ${track.album}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                trailingContent = { 
-                    TechnicalLabel(text = track.fileType, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                supportingContent = {
+                    Text(
+                        "${track.artist} — ${track.album}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingContent = {
+                    TechnicalLabel(
+                        text = track.fileType,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    )
                 },
                 modifier = Modifier.clickable { onItemClick(track) }
             )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
         }
     }
 }

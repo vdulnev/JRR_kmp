@@ -3,9 +3,26 @@ package com.example.jrr.service
 import arrow.core.Either
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.local.JRiverSettings
-import com.example.jrr.domain.model.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import com.example.jrr.domain.model.BrowseItem
+import com.example.jrr.domain.model.McwsError
+import com.example.jrr.domain.model.PlayerStatus
+import com.example.jrr.domain.model.PlayingNowItem
+import com.example.jrr.domain.model.Track
+import com.example.jrr.domain.model.Zone
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.koin.core.annotation.Single
 
 @Single

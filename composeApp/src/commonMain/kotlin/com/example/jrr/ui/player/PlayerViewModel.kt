@@ -3,9 +3,15 @@ package com.example.jrr.ui.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.touchlab.kermit.Logger
-import com.example.jrr.domain.model.*
+import com.example.jrr.domain.model.PlayerStatus
+import com.example.jrr.domain.model.PlayingNowItem
+import com.example.jrr.domain.model.Zone
 import com.example.jrr.service.JRiverService
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import org.koin.core.annotation.KoinViewModel
 
 data class PlayerUiState(
@@ -61,7 +67,7 @@ class PlayerViewModel(
         logger.d { "Previous requested" }
         jRiverService.previous()
     }
-    
+
     fun setVolume(level: Float) {
         logger.d { "Set volume to $level" }
         jRiverService.setVolume(level)

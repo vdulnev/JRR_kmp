@@ -1,6 +1,10 @@
 package com.example.jrr
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.local.JRiverSettings
 import com.example.jrr.navigation.AppNavHost
@@ -11,7 +15,7 @@ import org.koin.compose.koinInject
 @Composable
 fun App() {
     val logger = remember { Logger.withTag("App") }
-    
+
     val settings: JRiverSettings = koinInject()
     val jRiverService: JRiverService = koinInject()
     val mcwsClient: com.example.jrr.data.remote.mcws.JRiverMcwsClient = koinInject()

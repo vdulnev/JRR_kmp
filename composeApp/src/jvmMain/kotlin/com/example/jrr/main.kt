@@ -9,7 +9,7 @@ import com.example.jrr.ui.theme.ObsidianTheme
 
 fun main() = application {
     val dataStore = remember { createDataStore() }
-    
+
     remember {
         initKoin(dataStore)
     }

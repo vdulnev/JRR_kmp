@@ -22,24 +22,24 @@ It communicates with MCWS v1 over HTTP on a local network.
 
 ### 1.2 Scope
 
-| Area                        | Status   |
-|-----------------------------|----------|
-| Playback control            | v1       |
-| Now Playing info & artwork  | v1       |
-| Zone management             | v1       |
-| Playing Now queue           | v1       |
-| Library browse & search     | v2 (done)|
-| Library tree browsing       | v3 (done)|
-| UI design system & polish   | v4 (done)|
-| Multi-platform layouts      | v5 (done)|
-| Local playback (client zone)| v5 (done)|
-| Favorites (browse nodes)    | v5 (done)|
-| Offline Mode (server-less)  | v6 (done)|
-| Playlist management         | Later    |
-| File metadata editing       | Later    |
-| DSP & audio configuration   | Later    |
-| Video streaming             | Skip     |
-| Television & recording      | Skip     |
+| Area                         | Status    |
+|------------------------------|-----------|
+| Playback control             | v1        |
+| Now Playing info & artwork   | v1        |
+| Zone management              | v1        |
+| Playing Now queue            | v1        |
+| Library browse & search      | v2 (done) |
+| Library tree browsing        | v3 (done) |
+| UI design system & polish    | v4 (done) |
+| Multi-platform layouts       | v5 (done) |
+| Local playback (client zone) | v5 (done) |
+| Favorites (browse nodes)     | v5 (done) |
+| Offline Mode (server-less)   | v6 (done) |
+| Playlist management          | Later     |
+| File metadata editing        | Later     |
+| DSP & audio configuration    | Later     |
+| Video streaming              | Skip      |
+| Television & recording       | Skip      |
 
 ### 1.3 Non-Goals
 
@@ -98,6 +98,7 @@ On startup, client calls `GET /MCWS/v1/Alive` to verify the server
 is reachable and to retrieve server metadata.
 
 Response fields:
+
 - `RuntimeGUID` — unique server instance ID
 - `ProgramVersion` — MC version string
 - `FriendlyName` — user-assigned server name
@@ -110,34 +111,33 @@ they connected to the intended server.
 
 MCWS returns `<Response Status="Failure">` for errors.
 The client must handle:
+
 - Connection refused — server unreachable
 - HTTP 401 — invalid credentials
 - `Status="Failure"` — command rejected by server
 
 ---
 
-### 3.9 Case-Insensitivity 
+### 3.9 Case-Insensitivity
 
-Many MCWS metadata tags (Artist, Album, Genre, Name) are inconsistent in their 
-casing across different files or server responses. Clients should treat these 
-fields case-insensitively for comparison and grouping. 
+Many MCWS metadata tags (Artist, Album, Genre, Name) are inconsistent in their
+casing across different files or server responses. Clients should treat these
+fields case-insensitively for comparison and grouping.
 
-| Field             | Comparison Policy | Used In                       | 
-|-------------------|-------------------|-------------------------------| 
-| name              | Case-Insensitive  | Track/Album equality, grouping| 
-| artist            | Case-Insensitive  | Track/Album equality, filtering| 
-| album             | Case-Insensitive  | Track/Album equality, grouping| 
-| genre             | Case-Insensitive  | Track equality, filtering     | 
-| fileType          | Case-Insensitive  | Track equality                | 
-| albumArtist       | Case-Insensitive  | Album equality, filtering     | 
-| folderPath        | Case-Insensitive  | Album equality, grouping      | 
-| parentFolderPath  | Case-Insensitive  | Album/Track grouping          | 
+| Field            | Comparison Policy | Used In                         | 
+|------------------|-------------------|---------------------------------| 
+| name             | Case-Insensitive  | Track/Album equality, grouping  | 
+| artist           | Case-Insensitive  | Track/Album equality, filtering | 
+| album            | Case-Insensitive  | Track/Album equality, grouping  | 
+| genre            | Case-Insensitive  | Track equality, filtering       | 
+| fileType         | Case-Insensitive  | Track equality                  | 
+| albumArtist      | Case-Insensitive  | Album equality, filtering       | 
+| folderPath       | Case-Insensitive  | Album equality, grouping        | 
+| parentFolderPath | Case-Insensitive  | Album/Track grouping            | 
 
-Normalization. Values used as keys for internal grouping or identification 
-(e.g., albumGroupId) must be normalized to a consistent case (prefer 
-lowercase) before use. 
-
-
+Normalization. Values used as keys for internal grouping or identification
+(e.g., albumGroupId) must be normalized to a consistent case (prefer
+lowercase) before use.
 
 ## 2.5 Offline Mode (Server-less)
 
@@ -150,6 +150,7 @@ and an empty address to represent this state.
 
 **Behavior:**
 In Offline Mode:
+
 - All server-bound API calls are skipped.
 - The client-synthesized 'Offline' zone is the primary active zone.
 - The library view should only show 'Downloads' or locally cached content.
@@ -175,25 +176,25 @@ fields must be present.
 
 Represents the connected MCWS server.
 
-| Field           | Type   | Source                |
-|-----------------|--------|-----------------------|
-| id              | string | Alive → RuntimeGUID   |
-| name            | string | Alive → FriendlyName  |
-| version         | string | Alive → ProgramVersion|
-| platform        | string | Alive → Platform      |
-| address         | string | user-provided host:port|
+| Field    | Type   | Source                  |
+|----------|--------|-------------------------|
+| id       | string | Alive → RuntimeGUID     |
+| name     | string | Alive → FriendlyName    |
+| version  | string | Alive → ProgramVersion  |
+| platform | string | Alive → Platform        |
+| address  | string | user-provided host:port |
 
 ### 3.2 Zone
 
 Represents a playback zone.
 
-| Field    | Type   | Source                   |
-|----------|--------|--------------------------|
-| id       | string | Playback/Zones → ZoneID  |
-| name     | string | Playback/Zones → ZoneName|
-| guid     | string | Playback/Zones → ZoneGUID|
-| isDLNA   | bool   | Playback/Zones → ZoneDLNA|
-| isLocal  | bool   | client-synthesized (see §4.13) |
+| Field   | Type   | Source                         |
+|---------|--------|--------------------------------|
+| id      | string | Playback/Zones → ZoneID        |
+| name    | string | Playback/Zones → ZoneName      |
+| guid    | string | Playback/Zones → ZoneGUID      |
+| isDLNA  | bool   | Playback/Zones → ZoneDLNA      |
+| isLocal | bool   | client-synthesized (see §4.13) |
 
 A client may synthesize an additional **local zone** that represents
 the client device itself as a player. The local zone does not appear
@@ -228,22 +229,22 @@ local-playback mode (see §4.13).
 
 Snapshot of the current playback state for a zone.
 
-| Field                     | Type          | Source                              |
-|---------------------------|---------------|-------------------------------------|
-| zoneId                    | string        | Playback/Info → ZoneID              |
-| zoneName                  | string        | Playback/Info → ZoneName            |
-| state                     | PlaybackState | Playback/Info → State               |
-| trackInfo                 | TrackInfo?    | see below (null when queue empty)   |
-| positionMs                | int           | Playback/Info → PositionMS          |
-| durationMs                | int           | Playback/Info → DurationMS          |
-| positionDisplay           | string        | Playback/Info → PositionDisplay     |
-| volume                    | float         | Playback/Info → Volume (0.0–1.0)    |
-| volumeDisplay             | string        | Playback/Info → VolumeDisplay       |
-| isMuted                   | bool          | derived (see §4.5)                  |
-| shuffleMode               | ShuffleMode   | Playback/Shuffle                    |
-| repeatMode                | RepeatMode    | Playback/Repeat                     |
-| playingNowPosition        | int           | Playback/Info → PlayingNowPosition  |
-| playingNowTracks          | int           | Playback/Info → PlayingNowTracks    |
+| Field                     | Type          | Source                                    |
+|---------------------------|---------------|-------------------------------------------|
+| zoneId                    | string        | Playback/Info → ZoneID                    |
+| zoneName                  | string        | Playback/Info → ZoneName                  |
+| state                     | PlaybackState | Playback/Info → State                     |
+| trackInfo                 | TrackInfo?    | see below (null when queue empty)         |
+| positionMs                | int           | Playback/Info → PositionMS                |
+| durationMs                | int           | Playback/Info → DurationMS                |
+| positionDisplay           | string        | Playback/Info → PositionDisplay           |
+| volume                    | float         | Playback/Info → Volume (0.0–1.0)          |
+| volumeDisplay             | string        | Playback/Info → VolumeDisplay             |
+| isMuted                   | bool          | derived (see §4.5)                        |
+| shuffleMode               | ShuffleMode   | Playback/Shuffle                          |
+| repeatMode                | RepeatMode    | Playback/Repeat                           |
+| playingNowPosition        | int           | Playback/Info → PlayingNowPosition        |
+| playingNowTracks          | int           | Playback/Info → PlayingNowTracks          |
 | playingNowPositionDisplay | string        | Playback/Info → PlayingNowPositionDisplay |
 | playingNowChangeCounter   | int           | Playback/Info → PlayingNowChangeCounter   |
 
@@ -251,17 +252,17 @@ Snapshot of the current playback state for a zone.
 
 Metadata for the currently playing track.
 
-| Field      | Type   | Source                       |
-|------------|--------|------------------------------|
-| fileKey    | string | Playback/Info → FileKey      |
-| name       | string | Playback/Info → Name         |
-| artist     | string | Playback/Info → Artist       |
-| album      | string | Playback/Info → Album        |
+| Field      | Type   | Source                                         |
+|------------|--------|------------------------------------------------|
+| fileKey    | string | Playback/Info → FileKey                        |
+| name       | string | Playback/Info → Name                           |
+| artist     | string | Playback/Info → Artist                         |
+| album      | string | Playback/Info → Album                          |
 | imageUrl   | string | Playback/Info → ImageURL (resolve to full URL) |
-| bitrate    | int    | Playback/Info → Bitrate (kbps)    |
-| bitDepth   | int    | Playback/Info → Bitdepth          |
-| sampleRate | int    | Playback/Info → SampleRate (Hz)   |
-| channels   | int    | Playback/Info → Channels          |
+| bitrate    | int    | Playback/Info → Bitrate (kbps)                 |
+| bitDepth   | int    | Playback/Info → Bitdepth                       |
+| sampleRate | int    | Playback/Info → SampleRate (Hz)                |
+| channels   | int    | Playback/Info → Channels                       |
 
 `Playback/Info` is intentionally minimal. For richer metadata
 (`Date (readable)`, `File Type`, `Album Artist (auto)`, `Total Discs`,
@@ -272,13 +273,13 @@ etc.) clients fetch the full track via `File/GetInfo` (§4.10) keyed on
 
 An entry in the Playing Now queue.
 
-| Field   | Type   | Source                              |
-|---------|--------|-------------------------------------|
-| index   | int    | position in the list (0-based)      |
-| fileKey | string | from MPL/JSON response              |
-| name    | string | Name field                          |
-| artist  | string | Artist field                        |
-| album   | string | Album field                         |
+| Field   | Type   | Source                         |
+|---------|--------|--------------------------------|
+| index   | int    | position in the list (0-based) |
+| fileKey | string | from MPL/JSON response         |
+| name    | string | Name field                     |
+| artist  | string | Artist field                   |
+| album   | string | Album field                    |
 
 ---
 
@@ -292,15 +293,15 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 ### 4.1 Transport
 
-| Operation   | Endpoint                      | Key Parameters       |
-|-------------|-------------------------------|----------------------|
-| play        | Playback/Play                 | Zone, ZoneType       |
-| playPause   | Playback/PlayPause            | Zone, ZoneType       |
-| pause       | Playback/Pause                | State (0, 1, or -1)  |
-| stop        | Playback/Stop                 | Zone, ZoneType       |
-| stopAll     | Playback/StopAll              | —                    |
-| next        | Playback/Next                 | Zone, ZoneType       |
-| previous    | Playback/Previous             | Zone, ZoneType       |
+| Operation | Endpoint           | Key Parameters      |
+|-----------|--------------------|---------------------|
+| play      | Playback/Play      | Zone, ZoneType      |
+| playPause | Playback/PlayPause | Zone, ZoneType      |
+| pause     | Playback/Pause     | State (0, 1, or -1) |
+| stop      | Playback/Stop      | Zone, ZoneType      |
+| stopAll   | Playback/StopAll   | —                   |
+| next      | Playback/Next      | Zone, ZoneType      |
+| previous  | Playback/Previous  | Zone, ZoneType      |
 
 **Zone targeting:** Every transport command accepts `Zone` and
 `ZoneType` parameters. The client should always pass
@@ -310,15 +311,16 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 **Endpoint:** `Playback/Position`
 
-| Parameter | Type   | Description                           |
-|-----------|--------|---------------------------------------|
-| Position  | int    | Target position in ms or %            |
+| Parameter | Type   | Description                                 |
+|-----------|--------|---------------------------------------------|
+| Position  | int    | Target position in ms or %                  |
 | Relative  | int    | 1 = forward, -1 = backward, omit = absolute |
-| Mode      | string | `ms` (default) or `%`                 |
-| Zone      | string | Zone ID                               |
-| ZoneType  | string | `ID`                                  |
+| Mode      | string | `ms` (default) or `%`                       |
+| Zone      | string | Zone ID                                     |
+| ZoneType  | string | `ID`                                        |
 
 **Usage patterns:**
+
 - Get current position: omit `Position`
 - Seek to absolute time: `Position=30000&Mode=ms`
 - Jump forward 10s: `Position=10000&Relative=1`
@@ -331,20 +333,22 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 **Endpoint:** `Playback/Volume`
 
-| Parameter | Type  | Description                            |
-|-----------|-------|----------------------------------------|
-| Level     | float | 0.0 to 1.0 (omit to query only)       |
-| Relative  | int   | 1 = add Level to current              |
-| Zone      | string| Zone ID                                |
-| ZoneType  | string| `ID`                                   |
+| Parameter | Type   | Description                     |
+|-----------|--------|---------------------------------|
+| Level     | float  | 0.0 to 1.0 (omit to query only) |
+| Relative  | int    | 1 = add Level to current        |
+| Zone      | string | Zone ID                         |
+| ZoneType  | string | `ID`                            |
 
 **Usage patterns:**
+
 - Get current volume: omit `Level`
 - Set to 75%: `Level=0.75`
 - Increase by 10%: `Level=0.1&Relative=1`
 - Decrease by 10%: `Level=-0.1&Relative=1`
 
 **Response:**
+
 - `<Item Name="Level">` — volume as 0.0–1.0
 - `<Item Name="Display">` — volume as display string
 
@@ -352,11 +356,11 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 **Endpoint:** `Playback/Mute`
 
-| Parameter | Type | Description          |
-|-----------|------|----------------------|
-| Set       | int  | 1 = mute, 0 = unmute |
-| Zone      | string | Zone ID            |
-| ZoneType  | string | `ID`               |
+| Parameter | Type   | Description          |
+|-----------|--------|----------------------|
+| Set       | int    | 1 = mute, 0 = unmute |
+| Zone      | string | Zone ID              |
+| ZoneType  | string | `ID`                 |
 
 **Response:** `<Item Name="State">` — mute state after change.
 
@@ -364,20 +368,20 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 **Shuffle endpoint:** `Playback/Shuffle`
 
-| Parameter | Type   | Values                              |
-|-----------|--------|-------------------------------------|
+| Parameter | Type   | Values                                |
+|-----------|--------|---------------------------------------|
 | Mode      | string | Off, On, Automatic, Toggle, Reshuffle |
-| Zone      | string | Zone ID                             |
+| Zone      | string | Zone ID                               |
 
 - Omit `Mode` to query current state.
 - Response: `<Item Name="Mode">` — current mode after change.
 
 **Repeat endpoint:** `Playback/Repeat`
 
-| Parameter | Type   | Values                              |
-|-----------|--------|-------------------------------------|
-| Mode      | string | Off, Playlist, Track, Stop, Toggle  |
-| Zone      | string | Zone ID                             |
+| Parameter | Type   | Values                             |
+|-----------|--------|------------------------------------|
+| Mode      | string | Off, Playlist, Track, Stop, Toggle |
+| Zone      | string | Zone ID                            |
 
 - Omit `Mode` to query current state.
 - Response: `<Item Name="Mode">` — current mode after change.
@@ -386,10 +390,10 @@ Base URL: `http://<host>:<port>/MCWS/v1`
 
 **Endpoint:** `Playback/Info`
 
-| Parameter | Type   | Description                        |
-|-----------|--------|------------------------------------|
-| Zone      | string | Zone ID                            |
-| ZoneType  | string | `ID`                               |
+| Parameter | Type   | Description |
+|-----------|--------|-------------|
+| Zone      | string | Zone ID     |
+| ZoneType  | string | `ID`        |
 
 Returns all fields listed in `PlayerStatus` (§3.6) and
 `TrackInfo` (§3.7). This is the primary polling endpoint.
@@ -398,14 +402,14 @@ Returns all fields listed in `PlayerStatus` (§3.6) and
 
 **Endpoint:** `File/GetImage`
 
-| Parameter     | Type   | Description                       |
-|---------------|--------|-----------------------------------|
-| File          | string | File key from TrackInfo.fileKey   |
-| Type          | string | `Thumbnail` (default) or `Full`   |
-| Width         | int    | Desired width in pixels           |
-| Height        | int    | Desired height in pixels          |
-| Format        | string | `jpg` (default) or `png`          |
-| Square        | int    | 1 = crop to square                |
+| Parameter        | Type   | Description                     |
+|------------------|--------|---------------------------------|
+| File             | string | File key from TrackInfo.fileKey |
+| Type             | string | `Thumbnail` (default) or `Full` |
+| Width            | int    | Desired width in pixels         |
+| Height           | int    | Desired height in pixels        |
+| Format           | string | `jpg` (default) or `png`        |
+| Square           | int    | 1 = crop to square              |
 | FillTransparency | string | Hex color for transparency fill |
 
 Returns the image as binary data (not XML).
@@ -430,12 +434,12 @@ Returns `NumberZones` and indexed fields: `ZoneName#`, `ZoneID#`,
 
 **Link zones:** `Playback/LinkZones`
 
-| Parameter  | Type   |
-|------------|--------|
-| Zone1      | string |
-| ZoneType1  | string |
-| Zone2      | string |
-| ZoneType2  | string |
+| Parameter | Type   |
+|-----------|--------|
+| Zone1     | string |
+| ZoneType1 | string |
+| Zone2     | string |
+| ZoneType2 | string |
 
 **Unlink zone:** `Playback/UnlinkZones`
 
@@ -460,40 +464,40 @@ its own player. When the local zone is active:
 
 **Get queue:** `Playback/Playlist`
 
-| Parameter         | Type   | Description                    |
-|-------------------|--------|--------------------------------|
-| Action            | string | `JSON` for JSON array          |
-| Zone              | string | Zone ID                        |
-| ZoneType          | string | `ID`                           |
-| Fields            | string | semi-colon delimited field list|
-| NoLocalFilenames  | int    | 1 (filenames meaningless to remote client) |
+| Parameter        | Type   | Description                                |
+|------------------|--------|--------------------------------------------|
+| Action           | string | `JSON` for JSON array                      |
+| Zone             | string | Zone ID                                    |
+| ZoneType         | string | `ID`                                       |
+| Fields           | string | semi-colon delimited field list            |
+| NoLocalFilenames | int    | 1 (filenames meaningless to remote client) |
 
 Use `Action=JSON` and `Fields=Name;Artist;Album` for efficient
 retrieval. Response is a JSON array of file objects.
 
 **Play by index:** `Playback/PlayByIndex`
 
-| Parameter | Type | Description                |
-|-----------|------|----------------------------|
-| Index     | int  | 0-based index in queue     |
-| Zone      | string | Zone ID                  |
+| Parameter | Type   | Description            |
+|-----------|--------|------------------------|
+| Index     | int    | 0-based index in queue |
+| Zone      | string | Zone ID                |
 
 **Play by key:** `Playback/PlayByKey`
 
-| Parameter | Type   | Description                           |
-|-----------|--------|---------------------------------------|
-| Key       | string | File key (comma-separated for multiple)|
-| Location  | string | `End`, `Next`, or numeric index       |
-| Zone      | string | Zone ID                               |
+| Parameter | Type   | Description                             |
+|-----------|--------|-----------------------------------------|
+| Key       | string | File key (comma-separated for multiple) |
+| Location  | string | `End`, `Next`, or numeric index         |
+| Zone      | string | Zone ID                                 |
 
 **Edit queue:** `Playback/EditPlaylist`
 
-| Parameter | Type   | Description                |
-|-----------|--------|----------------------------|
-| Action    | string | `Move` or `Remove`         |
-| Source    | int    | Source index (0-based)     |
-| Target    | int    | Target index (for Move)    |
-| Zone      | string | Zone ID                    |
+| Parameter | Type   | Description             |
+|-----------|--------|-------------------------|
+| Action    | string | `Move` or `Remove`      |
+| Source    | int    | Source index (0-based)  |
+| Target    | int    | Target index (for Move) |
+| Zone      | string | Zone ID                 |
 
 **Clear queue:** `Playback/ClearPlaylist`
 
@@ -506,12 +510,12 @@ retrieval. Response is a JSON array of file objects.
 
 **Endpoint:** `Files/Search`
 
-| Parameter   | Type   | Description                              |
-|-------------|--------|------------------------------------------|
-| Action      | string | `JSON` for JSON array response           |
-| Query       | string | MCWS search expression (see below)       |
-| StartIndex  | int    | Offset for pagination (0-based)          |
-| Limit       | int    | Max results to return (-1 = unlimited)   |
+| Parameter  | Type   | Description                            |
+|------------|--------|----------------------------------------|
+| Action     | string | `JSON` for JSON array response         |
+| Query      | string | MCWS search expression (see below)     |
+| StartIndex | int    | Offset for pagination (0-based)        |
+| Limit      | int    | Max results to return (-1 = unlimited) |
 
 **Query syntax:**
 
@@ -521,6 +525,7 @@ Grouping: `(expr1 OR expr2)`.
 Negation: `-[Field]=Value`.
 
 Special modifiers appended to the query string:
+
 - `~sort=[Field]` — sort results by field
 - `~limit=N,M,[Field]` — return M items per distinct value of Field, N total groups
 - `~n=N` — random selection of N results
@@ -531,14 +536,14 @@ To use them literally in a value, prefix with `/`:
 
 **Common queries:**
 
-| Operation           | Query                                                                      |
-|---------------------|----------------------------------------------------------------------------|
-| Search tracks       | `[Media Type]=Audio ([Name] contains term OR [Artist] contains term OR [Album] contains term)` |
-| List all artists    | `[Media Type]=Audio ~limit=-1,1,[Artist] ~sort=[Artist]`                   |
-| Albums by artist    | `[Media Type]=Audio [Artist]=[artist] ~limit=-1,1,[Album] ~sort=[Album]`   |
-| Album tracks        | `[Media Type]=Audio [Album]=[name] [Artist]=[artist]`                      |
-| Tracks by folder    | `[Media Type]=Audio [Filename (path)]="folderPath"`                        |
-| Random albums       | `[Media Type]=[Audio] ~limit=10,-1,[Album],[Filename (path)] ~n=10`        |
+| Operation        | Query                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------|
+| Search tracks    | `[Media Type]=Audio ([Name] contains term OR [Artist] contains term OR [Album] contains term)` |
+| List all artists | `[Media Type]=Audio ~limit=-1,1,[Artist] ~sort=[Artist]`                                       |
+| Albums by artist | `[Media Type]=Audio [Artist]=[artist] ~limit=-1,1,[Album] ~sort=[Album]`                       |
+| Album tracks     | `[Media Type]=Audio [Album]=[name] [Artist]=[artist]`                                          |
+| Tracks by folder | `[Media Type]=Audio [Filename (path)]="folderPath"`                                            |
+| Random albums    | `[Media Type]=[Audio] ~limit=10,-1,[Album],[Filename (path)] ~n=10`                            |
 
 **Client-side filtering:** MCWS field matching (`[Artist]=value`) performs
 substring matching. The client must post-filter results for exact matches
@@ -567,11 +572,11 @@ MCWS exposes a hierarchical browse tree via two endpoints.
 
 **Endpoint:** `Browse/Children`
 
-| Parameter      | Type   | Description                           |
-|----------------|--------|---------------------------------------|
-| ID             | string | Node ID (`-1` for root)               |
-| Version        | int    | API version (use `1`)                 |
-| ErrorOnMissing | int    | `0` = return empty on missing node    |
+| Parameter      | Type   | Description                        |
+|----------------|--------|------------------------------------|
+| ID             | string | Node ID (`-1` for root)            |
+| Version        | int    | API version (use `1`)              |
+| ErrorOnMissing | int    | `0` = return empty on missing node |
 
 Response is XML with `<Item Name="label">childId</Item>` elements.
 Each item represents a child node in the browse hierarchy. The `Name`
@@ -579,6 +584,7 @@ attribute is the display label and the element text is the child ID
 used for further traversal.
 
 Example (root):
+
 ```xml
 <Response Status="OK">
   <Item Name="Audio">1</Item>
@@ -590,10 +596,10 @@ Example (root):
 
 **Endpoint:** `Browse/Files`
 
-| Parameter | Type   | Description                           |
-|-----------|--------|---------------------------------------|
-| ID        | string | Browse node ID                        |
-| Action    | string | `JSON` for JSON array response        |
+| Parameter | Type   | Description                    |
+|-----------|--------|--------------------------------|
+| ID        | string | Browse node ID                 |
+| Action    | string | `JSON` for JSON array response |
 
 Returns a JSON array of track objects (same schema as `Files/Search`
 with `Action=JSON`). Used when a browse node has no children (leaf).
@@ -602,11 +608,11 @@ with `Action=JSON`). Used when a browse node has no children (leaf).
 
 **Endpoint:** `File/GetInfo`
 
-| Parameter | Type   | Description                          |
-|-----------|--------|--------------------------------------|
-| Action    | string | `JSON` for JSON array response       |
-| File      | int    | File key                             |
-| Fields    | string | use `Calculated` for full metadata   |
+| Parameter | Type   | Description                        |
+|-----------|--------|------------------------------------|
+| Action    | string | `JSON` for JSON array response     |
+| File      | int    | File key                           |
+| Fields    | string | use `Calculated` for full metadata |
 
 Returns a one-element JSON array with the same shape as `Files/Search`.
 Used to enrich `Playback/Info` (which has only basic fields) with
@@ -616,14 +622,14 @@ full metadata for the now-playing screen.
 
 **Endpoint:** `File/GetFile`
 
-| Parameter   | Type   | Description                            |
-|-------------|--------|----------------------------------------|
-| File        | int    | File key                               |
-| FileType    | string | `Key`                                  |
-| Playback    | int    | `1` (mark as playback for stats)       |
-| Conversion  | string | `wav` (lossless) or `opus` (lossy)     |
-| Quality     | string | `high`, `normal`, or `low`             |
-| Token       | string | auth token (query param, like other endpoints) |
+| Parameter  | Type   | Description                                    |
+|------------|--------|------------------------------------------------|
+| File       | int    | File key                                       |
+| FileType   | string | `Key`                                          |
+| Playback   | int    | `1` (mark as playback for stats)               |
+| Conversion | string | `wav` (lossless) or `opus` (lossy)             |
+| Quality    | string | `high`, `normal`, or `low`                     |
+| Token      | string | auth token (query param, like other endpoints) |
 
 Returns the file as a continuous binary HTTP stream suitable for
 direct consumption by a media player (e.g. just_audio, ExoPlayer,
@@ -635,10 +641,10 @@ file itself and renders audio locally.
 
 ### 4.15 BrowseItem Model
 
-| Field | Type   | Source                         |
-|-------|--------|--------------------------------|
-| id    | string | Item element text (child ID)   |
-| name  | string | Item Name attribute (label)    |
+| Field | Type   | Source                       |
+|-------|--------|------------------------------|
+| id    | string | Item element text (child ID) |
+| name  | string | Item Name attribute (label)  |
 
 ### 4.16 Track Model (Library)
 
@@ -692,11 +698,11 @@ Albums with `Total Discs > 1` are returned by MCWS as one row per disc
 when grouped on `[Album]`. Clients should fold rows with the same
 `(album, parentFolderPath)` into an `AlbumGroup`:
 
-| Field   | Type          | Notes                                 |
-|---------|---------------|---------------------------------------|
-| album   | Album         | Lead disc (lowest `Disc #`)           |
-| discs   | List<Album>   | All discs, sorted by `Disc #`         |
-| date   | string         | Latest non-empty `dateReadable` across discs |
+| Field | Type        | Notes                                        |
+|-------|-------------|----------------------------------------------|
+| album | Album       | Lead disc (lowest `Disc #`)                  |
+| discs | List<Album> | All discs, sorted by `Disc #`                |
+| date  | string      | Latest non-empty `dateReadable` across discs |
 
 `isMultiDisc` ⇔ `discs.length > 1`. Tracks under a multi-disc album
 should be rendered grouped by `Disc #` with `Disc N of M` headers.
@@ -710,13 +716,13 @@ for state changes.
 
 ### 5.1 Intervals
 
-| Condition                  | Endpoint        | Interval |
-|----------------------------|-----------------|----------|
-| Playback state = playing   | Playback/Info   | 1 second |
-| Playback state = paused    | Playback/Info   | 5 seconds|
-| Playback state = stopped   | Playback/Info   | 5 seconds|
-| Zone list                  | Playback/Zones  | 30 seconds|
-| Active zone = local        | —               | suspended|
+| Condition                | Endpoint       | Interval   |
+|--------------------------|----------------|------------|
+| Playback state = playing | Playback/Info  | 1 second   |
+| Playback state = paused  | Playback/Info  | 5 seconds  |
+| Playback state = stopped | Playback/Info  | 5 seconds  |
+| Zone list                | Playback/Zones | 30 seconds |
+| Active zone = local      | —              | suspended  |
 
 ### 5.2 Change Detection
 
@@ -902,6 +908,7 @@ http://{host}:{port}/MCWS/v1/{endpoint}?{params}&Token={token}
 ```
 
 The API client must:
+
 - URL-encode parameter values
 - Always include `ZoneType=ID` when passing a zone ID
 - Resolve relative image URLs against the base URL
@@ -1016,42 +1023,45 @@ This spec follows semantic versioning.
 
 ## Appendix A: MCWS Endpoint Reference (v1 Scope)
 
-| Endpoint                  | Method | Description                    |
-|---------------------------|--------|--------------------------------|
-| Alive                     | GET    | Server health & version        |
-| Authenticate              | GET    | Get auth token                 |
-| Playback/Play             | GET    | Start playback                 |
-| Playback/PlayPause        | GET    | Toggle play/pause              |
-| Playback/Pause            | GET    | Set pause state                |
-| Playback/Stop             | GET    | Stop playback                  |
-| Playback/StopAll          | GET    | Stop all zones                 |
-| Playback/Next             | GET    | Next track                     |
-| Playback/Previous         | GET    | Previous track                 |
-| Playback/Position         | GET    | Get/set position               |
-| Playback/Volume           | GET    | Get/set volume                 |
-| Playback/Mute             | GET    | Set mute state                 |
-| Playback/Shuffle          | GET    | Get/set shuffle mode           |
-| Playback/Repeat           | GET    | Get/set repeat mode            |
-| Playback/Info             | GET    | Get playback info              |
-| Playback/Zones            | GET    | List zones                     |
-| Playback/SetZone          | GET    | Set active zone                |
-| Playback/LinkZones        | GET    | Link two zones                 |
-| Playback/UnlinkZones      | GET    | Unlink a zone                  |
-| Playback/Playlist         | GET    | Get playing now queue          |
-| Playback/PlayByIndex      | GET    | Play queue item by index       |
-| Playback/PlayByKey        | GET    | Play file(s) by key            |
-| Playback/EditPlaylist     | GET    | Move/remove queue items        |
-| Playback/ClearPlaylist    | GET    | Clear the queue                |
-| File/GetImage             | GET    | Get file artwork               |
-| File/GetInfo              | GET    | Get full metadata for one file |
-| File/GetFile              | GET    | Stream a file (local playback) |
-| Files/Search              | GET    | Search/browse library          |
-| Browse/Children           | GET    | List child browse nodes        |
-| Browse/Files              | GET    | Get tracks at browse leaf node |
+| Endpoint               | Method | Description                    |
+|------------------------|--------|--------------------------------|
+| Alive                  | GET    | Server health & version        |
+| Authenticate           | GET    | Get auth token                 |
+| Playback/Play          | GET    | Start playback                 |
+| Playback/PlayPause     | GET    | Toggle play/pause              |
+| Playback/Pause         | GET    | Set pause state                |
+| Playback/Stop          | GET    | Stop playback                  |
+| Playback/StopAll       | GET    | Stop all zones                 |
+| Playback/Next          | GET    | Next track                     |
+| Playback/Previous      | GET    | Previous track                 |
+| Playback/Position      | GET    | Get/set position               |
+| Playback/Volume        | GET    | Get/set volume                 |
+| Playback/Mute          | GET    | Set mute state                 |
+| Playback/Shuffle       | GET    | Get/set shuffle mode           |
+| Playback/Repeat        | GET    | Get/set repeat mode            |
+| Playback/Info          | GET    | Get playback info              |
+| Playback/Zones         | GET    | List zones                     |
+| Playback/SetZone       | GET    | Set active zone                |
+| Playback/LinkZones     | GET    | Link two zones                 |
+| Playback/UnlinkZones   | GET    | Unlink a zone                  |
+| Playback/Playlist      | GET    | Get playing now queue          |
+| Playback/PlayByIndex   | GET    | Play queue item by index       |
+| Playback/PlayByKey     | GET    | Play file(s) by key            |
+| Playback/EditPlaylist  | GET    | Move/remove queue items        |
+| Playback/ClearPlaylist | GET    | Clear the queue                |
+| File/GetImage          | GET    | Get file artwork               |
+| File/GetInfo           | GET    | Get full metadata for one file |
+| File/GetFile           | GET    | Stream a file (local playback) |
+| Files/Search           | GET    | Search/browse library          |
+| Browse/Children        | GET    | List child browse nodes        |
+| Browse/Files           | GET    | Get tracks at browse leaf node |
 
 ### Appendix B: External Endpoints (non-MCWS)
 
-| Endpoint                                   | Purpose                                      |
-|--------------------------------------------|----------------------------------------------|
-| `webplay.jriver.com/libraryserver/lookup`  | Resolve JRiver Access Key → server host/port |
-17. Treat core metadata as case-insensitive. MCWS tags are often inconsistently cased. Comparison and grouping (especially for albums) must use case-insensitive logic to avoid fragmented results.
+| Endpoint                                  | Purpose                                      |
+|-------------------------------------------|----------------------------------------------|
+| `webplay.jriver.com/libraryserver/lookup` | Resolve JRiver Access Key → server host/port |
+
+17. Treat core metadata as case-insensitive. MCWS tags are often inconsistently cased. Comparison
+    and grouping (especially for albums) must use case-insensitive logic to avoid fragmented
+    results.

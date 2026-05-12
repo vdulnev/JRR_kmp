@@ -17,16 +17,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         logger.i { "onCreate started" }
         enableEdgeToEdge()
-        
+
         val dataStore: DataStore<Preferences> = createDataStore(this)
-        
+
         initKoin(dataStore, this) {
             androidContext(this@MainActivity)
         }
-        
+
         setContent {
             ObsidianTheme {
                 App()

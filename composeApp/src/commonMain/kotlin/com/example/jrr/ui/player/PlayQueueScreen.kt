@@ -1,11 +1,22 @@
 package com.example.jrr.ui.player
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +39,7 @@ fun PlayQueueScreen(
     ) {
         items(uiState.queue) { item ->
             val isPlaying = item.fileKey == currentTrackKey
-            
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface,
@@ -45,7 +56,7 @@ fun PlayQueueScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(32.dp)
                     )
-                    
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = item.name,
@@ -61,7 +72,11 @@ fun PlayQueueScreen(
                     }
 
                     IconButton(onClick = { viewModel.removeFromQueue(item.index) }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.outline)
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Remove",
+                            tint = MaterialTheme.colorScheme.outline
+                        )
                     }
                 }
             }

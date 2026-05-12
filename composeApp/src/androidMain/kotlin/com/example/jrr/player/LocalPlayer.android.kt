@@ -48,7 +48,8 @@ class AndroidLocalPlayer(context: Context) : LocalPlayer {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 logger.v { "ExoPlayer isPlaying changed: $isPlaying" }
-                _playbackState.value = if (isPlaying) PlaybackState.PLAYING else PlaybackState.PAUSED
+                _playbackState.value =
+                    if (isPlaying) PlaybackState.PLAYING else PlaybackState.PAUSED
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {

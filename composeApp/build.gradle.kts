@@ -17,7 +17,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -27,9 +27,9 @@ kotlin {
             isStatic = true
         }
     }
-    
+
     jvm()
-    
+
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
@@ -50,7 +50,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.androidx.navigation.compose)
-            
+
             // Networking & Serialization
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
@@ -66,7 +66,7 @@ kotlin {
 
             // Icons
             implementation(libs.compose.material.icons.extended)
-            
+
             // Image Loading
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)

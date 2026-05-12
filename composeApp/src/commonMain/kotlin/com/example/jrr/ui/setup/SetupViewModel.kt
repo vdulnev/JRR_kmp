@@ -80,11 +80,16 @@ class SetupViewModel(
         }
     }
 
-    fun onAccessKeyChange(value: String) = _uiState.update { it.copy(accessKey = value, error = null) }
+    fun onAccessKeyChange(value: String) =
+        _uiState.update { it.copy(accessKey = value, error = null) }
+
     fun onHostChange(value: String) = _uiState.update { it.copy(host = value, error = null) }
     fun onPortChange(value: String) = _uiState.update { it.copy(port = value, error = null) }
-    fun onUsernameChange(value: String) = _uiState.update { it.copy(username = value, error = null) }
-    fun onPasswordChange(value: String) = _uiState.update { it.copy(password = value, error = null) }
+    fun onUsernameChange(value: String) =
+        _uiState.update { it.copy(username = value, error = null) }
+
+    fun onPasswordChange(value: String) =
+        _uiState.update { it.copy(password = value, error = null) }
 
     fun onConnect() {
         val state = _uiState.value
@@ -135,7 +140,12 @@ class SetupViewModel(
             mcwsClient.alive(server.address).fold(
                 ifLeft = { err ->
                     logger.e { "Saved server unreachable at ${server.address}: ${err.message}" }
-                    _uiState.update { it.copy(isLoading = false, error = "Server unreachable: ${err.message}") }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "Server unreachable: ${err.message}"
+                        )
+                    }
                 },
                 ifRight = { info ->
                     _uiState.update { it.copy(serverInfo = info) }
@@ -145,7 +155,11 @@ class SetupViewModel(
         }
     }
 
-    private suspend fun authenticateAndSave(address: String, serverInfo: ServerInfo, accessKey: String?) {
+    private suspend fun authenticateAndSave(
+        address: String,
+        serverInfo: ServerInfo,
+        accessKey: String?
+    ) {
         val state = _uiState.value
         logger.i { "Authenticating for user '${state.username}' at $address" }
         either<DomainError, String> {
@@ -156,7 +170,12 @@ class SetupViewModel(
         }.fold(
             ifLeft = { err ->
                 logger.e { "Authentication failed: ${err.message}" }
-                _uiState.update { it.copy(isLoading = false, error = "Authentication failed: ${err.message}") }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Authentication failed: ${err.message}"
+                    )
+                }
             },
             ifRight = { token ->
                 logger.i { "Authentication successful. Saving settings." }

@@ -3,7 +3,8 @@
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
         <!-- Local IP ranges -->
-        <domain includeSubdomains="true">192.168.1.116</domain> <!-- Specifically for the user's current server -->
+        <domain includeSubdomains="true">192.168.1.116
+        </domain> <!-- Specifically for the user's current server -->
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">10.0.0.0/8</domain>
         <domain includeSubdomains="true">172.16.0.0/12</domain>

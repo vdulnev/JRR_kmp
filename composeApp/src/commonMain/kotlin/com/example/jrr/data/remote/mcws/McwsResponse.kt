@@ -13,9 +13,9 @@ data class McwsResponse(
 ) {
     fun toMap(): Map<String, String> {
         val map = mutableMapOf<String, String>()
-        items.forEach { 
+        items.forEach {
             // Store with original case but we'll use a case-insensitive accessor or normalize
-            map[it.name.lowercase()] = it.value 
+            map[it.name.lowercase()] = it.value
         }
         return map
     }

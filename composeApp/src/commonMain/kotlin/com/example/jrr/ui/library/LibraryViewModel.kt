@@ -83,7 +83,11 @@ class LibraryViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
                 try {
                     val children = jRiverService.browseChildren(previousItem.id)
-                    val tracks = jRiverService.browseFiles(previousItem.id)
+                    val tracks = if (children.isEmpty()) {
+                        jRiverService.browseFiles(previousItem.id)
+                    } else {
+                        emptyList()
+                    }
                     _uiState.value = _uiState.value.copy(
                         navigationStack = newStack,
                         children = children,

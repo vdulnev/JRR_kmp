@@ -2,312 +2,266 @@ package com.example.jrr.service
 
 import co.touchlab.kermit.Logger
 import com.example.jrr.data.local.JRiverSettings
-import com.example.jrr.data.remote.mcws.JRiverMcwsClient
 import com.example.jrr.domain.model.*
-import com.example.jrr.player.LocalPlayer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.koin.core.annotation.Single
 
 @Single
 class JRiverService(
-    private val mcwsClient: JRiverMcwsClient,
-    private val localPlayer: LocalPlayer,
+    private val mcwsService: McwsService,
+    private val localAudioService: LocalAudioService,
     private val settings: JRiverSettings
 ) {
     private val logger = Logger.withTag("JRiverService")
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val localZone = Zone(id = "local", name = "This Device", guid = "local_guid", isDLNA = false, isLocal = true)
 
-    private val _playerStatus = MutableStateFlow<PlayerStatus?>(null)
-    val playerStatus: StateFlow<PlayerStatus?> = _playerStatus.asStateFlow()
+    private val _activeZoneId = MutableStateFlow<String?>(null)
 
-    private val _zones = MutableStateFlow<List<Zone>>(listOf(localZone))
-    val zones: StateFlow<List<Zone>> = _zones.asStateFlow()
+    val playerStatus: StateFlow<PlayerStatus?> = combine(
+        _activeZoneId,
+        mcwsService.playerStatus,
+        localAudioService.playerStatus
+    ) { activeZoneId, remoteStatus, localStatus ->
+        if (activeZoneId == LocalAudioService.LOCAL_ZONE_ID) localStatus else remoteStatus
+    }.onEach { status ->
+        logger.v {
+            "Published player status: zone=${status?.zoneId}, state=${status?.state}, " +
+                "track=${status?.trackInfo?.fileKey}, positionMs=${status?.positionMs}, queueTracks=${status?.playingNowTracks}"
+        }
+    }.stateIn(scope, SharingStarted.Eagerly, null)
 
-    private val _currentQueue = MutableStateFlow<List<PlayingNowItem>>(emptyList())
-    val currentQueue: StateFlow<List<PlayingNowItem>> = _currentQueue.asStateFlow()
+    val zones: StateFlow<List<Zone>> = combine(mcwsService.zones, flowOf(localAudioService.zone)) { remoteZones, localZone ->
+        remoteZones + localZone
+    }.onEach { zones ->
+        logger.d { "Published zones: ${zones.joinToString { "${it.id}:${it.name}${if (it.isLocal) "(local)" else ""}" }}" }
+    }.stateIn(scope, SharingStarted.Eagerly, listOf(localAudioService.zone))
 
-    private var activeZoneId: String? = null // Start as null to trigger initial restoration
-    private var lastChangeCounter: Int = -1
-    private var pollingJob: Job? = null
-    private var zonesPollingJob: Job? = null
-    
-    private var currentLocalTrack: Track? = null
+    val currentQueue: StateFlow<List<PlayingNowItem>> = combine(
+        _activeZoneId,
+        mcwsService.currentQueue
+    ) { activeZoneId, remoteQueue ->
+        if (activeZoneId == LocalAudioService.LOCAL_ZONE_ID) emptyList() else remoteQueue
+    }.onEach { queue ->
+        logger.v { "Published queue: activeZone=${_activeZoneId.value}, size=${queue.size}" }
+    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    private var startupJob: Job? = null
+    private var zoneRestoreJob: Job? = null
 
     fun start() {
-        logger.i { "Starting service" }
-        
-        // Initial restoration attempt
-        scope.launch {
+        if (startupJob?.isActive == true || zoneRestoreJob?.isActive == true) {
+            logger.d {
+                "Service already running: startupActive=${startupJob?.isActive == true}, " +
+                    "restoreActive=${zoneRestoreJob?.isActive == true}, activeZone=${_activeZoneId.value}"
+            }
+            return
+        }
+
+        logger.i { "Starting service coordinator" }
+        logger.d { "Starting MCWS backend for zone discovery" }
+        mcwsService.start()
+
+        startupJob = scope.launch {
             val savedGuid = settings.lastZoneGuid.first()
             logger.d { "Startup - Saved zone GUID: $savedGuid" }
-            if (savedGuid == "local_guid" || savedGuid == null) {
-                logger.i { "Restoring 'local' zone on startup" }
-                activeZoneId = "local"
-                updateLocalStatus()
-            } else {
-                // We'll wait for pollZones to find the GUID
-                logger.d { "Waiting for pollZones to restore $savedGuid" }
+            if (savedGuid == null || savedGuid == LocalAudioService.LOCAL_ZONE_GUID) {
+                logger.i { "Restoring local zone on startup" }
+                setActiveZone(LocalAudioService.LOCAL_ZONE_ID)
             }
         }
 
-        startPlaybackPolling()
-        startZonesPolling()
-        
-        // Watch local player state to update PlayerStatus when active
-        scope.launch {
-            localPlayer.playbackState.collect { 
-                logger.v { "Local player state changed: $it" }
-                updateLocalStatus() 
+        zoneRestoreJob = scope.launch {
+            logger.d { "Starting remote zone restore collector" }
+            mcwsService.zones.drop(1).collect { remoteZones ->
+                logger.d {
+                    "Restore collector received remote zones: count=${remoteZones.size}, " +
+                        "activeZone=${_activeZoneId.value}"
+                }
+                if (_activeZoneId.value != null) {
+                    logger.v { "Skipping zone restore because active zone is already ${_activeZoneId.value}" }
+                    return@collect
+                }
+
+                val savedGuid = settings.lastZoneGuid.first()
+                val restoredZone = remoteZones.find { it.guid == savedGuid }
+                when {
+                    restoredZone != null -> {
+                        logger.i { "Restored last selected zone: ${restoredZone.name} (id: ${restoredZone.id})" }
+                        setActiveZone(restoredZone.id)
+                    }
+                    remoteZones.isNotEmpty() -> {
+                        logger.i { "Last selected zone not found, selecting first: ${remoteZones.first().name}" }
+                        setActiveZone(remoteZones.first().id)
+                    }
+                    else -> {
+                        logger.i { "No server zones found, selecting local" }
+                        setActiveZone(LocalAudioService.LOCAL_ZONE_ID)
+                    }
+                }
             }
-        }
-        scope.launch {
-            localPlayer.currentPositionMs.collect { updateLocalStatus() }
         }
     }
 
     fun stop() {
-        logger.i { "Stopping service" }
-        pollingJob?.cancel()
-        zonesPollingJob?.cancel()
-        localPlayer.stop()
+        logger.i { "Stopping service coordinator: activeZone=${_activeZoneId.value}" }
+        logger.d {
+            "Cancelling coordinator jobs: startupActive=${startupJob?.isActive == true}, " +
+                "restoreActive=${zoneRestoreJob?.isActive == true}"
+        }
+        startupJob?.cancel()
+        zoneRestoreJob?.cancel()
+        startupJob = null
+        zoneRestoreJob = null
+        _activeZoneId.value = null
+        logger.d { "Stopping MCWS and local audio backends" }
+        mcwsService.stop()
+        localAudioService.stop()
     }
 
     fun setActiveZone(zoneId: String) {
-        logger.i { "Setting active zone to $zoneId" }
-        activeZoneId = zoneId
-        
-        // Persist GUID
-        scope.launch {
-            val zone = _zones.value.find { it.id == zoneId }
-            if (zone != null) {
-                logger.d { "Saving last zone GUID: ${zone.guid}" }
+        val previousZoneId = _activeZoneId.value
+        logger.i { "Setting active zone: previous=$previousZoneId, next=$zoneId" }
+        _activeZoneId.value = zoneId
+
+        val zone = zones.value.find { it.id == zoneId }
+        if (zone != null) {
+            scope.launch {
+                logger.d { "Saving last zone GUID: ${zone.guid} for zone ${zone.id}:${zone.name}" }
                 settings.saveLastZone(zone.guid)
             }
-        }
-
-        if (zoneId == "local") {
-            updateLocalStatus()
         } else {
-            // Trigger immediate poll
-            scope.launch { pollPlaybackInfo() }
+            logger.w { "Selected zone $zoneId is not present in published zones: ${zones.value.map { it.id }}" }
+        }
+
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) {
+            logger.d { "Routing active zone to local backend and clearing MCWS active zone" }
+            mcwsService.clearActiveZone()
+            localAudioService.start()
+        } else {
+            logger.d { "Routing active zone to MCWS backend and deactivating local observers" }
+            localAudioService.deactivate()
+            mcwsService.setActiveZone(zoneId)
         }
     }
 
-    private fun startPlaybackPolling() {
-        pollingJob?.cancel()
-        pollingJob = scope.launch {
-            while (isActive) {
-                if (activeZoneId != null && activeZoneId != "local") {
-                    pollPlaybackInfo()
-                }
-                val currentStatus = _playerStatus.value
-                val interval = when (currentStatus?.state) {
-                    PlaybackState.PLAYING -> 1000L
-                    PlaybackState.PAUSED, PlaybackState.STOPPED -> 5000L
-                    else -> 5000L
-                }
-                delay(interval)
-            }
-        }
+    fun play() {
+        val zoneId = activeZoneOrLog("play") ?: return
+        logger.d { "Command play routed to ${backendName(zoneId)} zone=$zoneId" }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) localAudioService.play() else mcwsService.play(zoneId)
     }
 
-    private fun startZonesPolling() {
-        zonesPollingJob?.cancel()
-        zonesPollingJob = scope.launch {
-            while (isActive) {
-                pollZones()
-                delay(30000L)
-            }
-        }
+    fun pause() {
+        val zoneId = activeZoneOrLog("pause") ?: return
+        logger.d { "Command pause routed to ${backendName(zoneId)} zone=$zoneId" }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) localAudioService.pause() else mcwsService.pause(zoneId)
     }
 
-    private suspend fun pollPlaybackInfo() {
-        mcwsClient.getPlaybackInfo(activeZoneId).fold(
-            onSuccess = { status ->
-                _playerStatus.value = status
-                if (status.playingNowChangeCounter != lastChangeCounter) {
-                    logger.d { "Change counter changed (${lastChangeCounter} -> ${status.playingNowChangeCounter}). Tracks in server info: ${status.playingNowTracks}. Fetching queue." }
-                    lastChangeCounter = status.playingNowChangeCounter
-                    fetchQueue(status.zoneId)
-                }
-            },
-            onFailure = {
-                logger.w { "Failed to poll playback info: ${it.message}" }
-            }
-        )
+    fun playPause() {
+        val zoneId = activeZoneOrLog("playPause") ?: return
+        logger.d { "Command playPause routed to ${backendName(zoneId)} zone=$zoneId" }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) localAudioService.playPause() else mcwsService.playPause(zoneId)
     }
 
-    private suspend fun pollZones() {
-        logger.v { "Polling zones..." }
-        mcwsClient.getZones().fold(
-            onSuccess = { zonesFromServer ->
-                logger.d { "Successfully polled ${zonesFromServer.size} zones from server" }
-                val allZones = zonesFromServer + localZone
-                _zones.value = allZones
-                
-                if (activeZoneId == null) {
-                    val savedGuid = settings.lastZoneGuid.first()
-                    val restoredZone = allZones.find { it.guid == savedGuid }
-                    
-                    if (restoredZone != null) {
-                        logger.i { "Restored last selected zone: ${restoredZone.name} (id: ${restoredZone.id})" }
-                        setActiveZone(restoredZone.id)
-                    } else if (zonesFromServer.isNotEmpty()) {
-                        logger.i { "Last selected zone not found, selecting first: ${zonesFromServer.first().name}" }
-                        setActiveZone(zonesFromServer.first().id)
-                    } else {
-                        logger.i { "No server zones found, selecting local" }
-                        setActiveZone("local")
-                    }
-                }
-            },
-            onFailure = { 
-                logger.w { "Failed to poll zones: ${it.message}" }
-                _zones.value = listOf(localZone)
-                if (activeZoneId == null) {
-                    setActiveZone("local")
-                }
-            }
-        )
+    fun next() {
+        val zoneId = remoteZoneOrLog("next") ?: return
+        logger.d { "Command next routed to MCWS zone=$zoneId" }
+        mcwsService.next(zoneId)
     }
 
-    private fun updateLocalStatus() {
-        if (activeZoneId != "local") return
-        
-        val trackInfo = currentLocalTrack?.let { 
-            TrackInfo(
-                fileKey = it.fileKey.toString(),
-                name = it.name,
-                artist = it.artist,
-                album = it.album,
-                imageUrl = it.imageUrl,
-                bitrate = it.bitrate,
-                bitDepth = it.bitDepth,
-                sampleRate = it.sampleRate,
-                channels = it.channels
-            )
-        }
-
-        _playerStatus.value = PlayerStatus(
-            zoneId = "local",
-            zoneName = "This Device",
-            state = localPlayer.playbackState.value,
-            trackInfo = trackInfo,
-            positionMs = localPlayer.currentPositionMs.value,
-            durationMs = localPlayer.durationMs.value,
-            positionDisplay = formatTime(localPlayer.currentPositionMs.value),
-            volume = localPlayer.volume.value,
-            volumeDisplay = "${(localPlayer.volume.value * 100).toInt()}%",
-            isMuted = false,
-            shuffleMode = ShuffleMode.OFF,
-            repeatMode = RepeatMode.OFF,
-            playingNowPosition = 0,
-            playingNowTracks = _currentQueue.value.size,
-            playingNowPositionDisplay = "",
-            playingNowChangeCounter = 0
-        )
+    fun previous() {
+        val zoneId = remoteZoneOrLog("previous") ?: return
+        logger.d { "Command previous routed to MCWS zone=$zoneId" }
+        mcwsService.previous(zoneId)
     }
 
-    private fun formatTime(ms: Int): String {
-        val totalSeconds = ms / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        return "${minutes}:${seconds.toString().padStart(2, '0')}"
+    fun setVolume(level: Float) {
+        val zoneId = activeZoneOrLog("setVolume") ?: return
+        logger.d { "Command setVolume routed to ${backendName(zoneId)} zone=$zoneId level=$level" }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) localAudioService.setVolume(level) else mcwsService.setVolume(zoneId, level)
     }
 
-    private suspend fun fetchQueue(zoneId: String) {
-        if (zoneId == "local") return // Local queue is managed client-side or from a server-side list
-        logger.d { "Fetching queue for zone $zoneId" }
-        mcwsClient.getPlayingNow(zoneId).fold(
-            onSuccess = { 
-                logger.d { "Successfully fetched queue (${it.size} items)" }
-                _currentQueue.value = it 
-            },
-            onFailure = { 
-                logger.e(it) { "Failed to fetch queue: ${it.message}" }
-            }
-        )
-    }
-
-    // Transport proxy methods
-    fun play() = scope.launch { 
-        if (activeZoneId == "local") localPlayer.resume() 
-        else activeZoneId?.let { mcwsClient.play(it) } 
-    }
-    fun pause() = scope.launch { 
-        if (activeZoneId == "local") localPlayer.pause()
-        else activeZoneId?.let { mcwsClient.pause(it) } 
-    }
-    fun playPause() = scope.launch { 
-        if (activeZoneId == "local") {
-            if (localPlayer.playbackState.value == PlaybackState.PLAYING) localPlayer.pause() else localPlayer.resume()
-        } else activeZoneId?.let { mcwsClient.playPause(it) } 
-    }
-    fun next() = scope.launch { activeZoneId?.let { mcwsClient.next(it) } }
-    fun previous() = scope.launch { activeZoneId?.let { mcwsClient.previous(it) } }
-
-    fun setVolume(level: Float) = scope.launch { 
-        if (activeZoneId == "local") localPlayer.setVolume(level)
-        else activeZoneId?.let { mcwsClient.setVolume(it, level) } 
-    }
-    fun seek(positionMs: Int) = scope.launch { 
-        if (activeZoneId == "local") localPlayer.seekTo(positionMs)
-        else activeZoneId?.let { mcwsClient.seek(it, positionMs) } 
+    fun seek(positionMs: Int) {
+        val zoneId = activeZoneOrLog("seek") ?: return
+        logger.d { "Command seek routed to ${backendName(zoneId)} zone=$zoneId positionMs=$positionMs" }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) localAudioService.seek(positionMs) else mcwsService.seek(zoneId, positionMs)
     }
 
     fun playTrack(track: Track) {
-        logger.i { "Playing track: ${track.name} (zone: $activeZoneId)" }
-        if (activeZoneId == "local") {
-            currentLocalTrack = track
-            val url = mcwsClient.buildStreamUrl(track.fileKey.toString())
-            localPlayer.play(url)
-            updateLocalStatus()
+        val zoneId = activeZoneOrLog("playTrack") ?: return
+        logger.i {
+            "Command playTrack routed to ${backendName(zoneId)} zone=$zoneId, " +
+                "trackKey=${track.fileKey}, name=${track.name}, artist=${track.artist}"
+        }
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) {
+            localAudioService.playTrack(track)
         } else {
-            scope.launch {
-                activeZoneId?.let { zoneId ->
-                    mcwsClient.playByKey(zoneId, track.fileKey.toString())
-                }
-            }
+            mcwsService.playTrack(zoneId, track)
         }
     }
 
-    fun setQueuePosition(index: Int) = scope.launch { activeZoneId?.let { mcwsClient.setQueuePosition(it, index) } }
-    fun reorderQueue(from: Int, to: Int) = scope.launch { activeZoneId?.let { mcwsClient.reorderQueue(it, from, to) } }
-    fun removeFromQueue(index: Int) = scope.launch { activeZoneId?.let { mcwsClient.removeFromQueue(it, index) } }
+    fun setQueuePosition(index: Int) {
+        val zoneId = remoteZoneOrLog("setQueuePosition") ?: return
+        logger.d { "Command setQueuePosition routed to MCWS zone=$zoneId index=$index" }
+        mcwsService.setQueuePosition(zoneId, index)
+    }
 
-    fun linkZones(targetZoneIds: List<String>) = scope.launch { activeZoneId?.let { mcwsClient.linkZones(it, targetZoneIds) } }
-    fun unlinkZone(zoneId: String) = scope.launch { mcwsClient.unlinkZone(zoneId) }
+    fun reorderQueue(from: Int, to: Int) {
+        val zoneId = remoteZoneOrLog("reorderQueue") ?: return
+        logger.d { "Command reorderQueue routed to MCWS zone=$zoneId from=$from to=$to" }
+        mcwsService.reorderQueue(zoneId, from, to)
+    }
 
-    // Library Operations
+    fun removeFromQueue(index: Int) {
+        val zoneId = remoteZoneOrLog("removeFromQueue") ?: return
+        logger.d { "Command removeFromQueue routed to MCWS zone=$zoneId index=$index" }
+        mcwsService.removeFromQueue(zoneId, index)
+    }
+
+    fun linkZones(targetZoneIds: List<String>) {
+        val zoneId = remoteZoneOrLog("linkZones") ?: return
+        logger.i { "Command linkZones routed to MCWS zone=$zoneId targets=$targetZoneIds" }
+        mcwsService.linkZones(zoneId, targetZoneIds)
+    }
+
+    fun unlinkZone(zoneId: String) {
+        logger.i { "Command unlinkZone routed to MCWS zone=$zoneId" }
+        mcwsService.unlinkZone(zoneId)
+    }
+
     suspend fun browseChildren(id: String = "-1"): List<BrowseItem> {
-        return mcwsClient.browseChildren(id).fold(
-            onSuccess = { it },
-            onFailure = { 
-                logger.e { "Failed to browse children for ID $id: ${it.message}" }
-                emptyList() 
-            }
-        )
+        logger.d { "Library browseChildren routed to MCWS id=$id" }
+        return mcwsService.browseChildren(id)
     }
 
     suspend fun browseFiles(id: String): List<Track> {
-        return mcwsClient.browseFiles(id).fold(
-            onSuccess = { it },
-            onFailure = { 
-                logger.e { "Failed to browse files for ID $id: ${it.message}" }
-                emptyList() 
-            }
-        )
+        logger.d { "Library browseFiles routed to MCWS id=$id" }
+        return mcwsService.browseFiles(id)
     }
 
     suspend fun search(query: String, limit: Int = -1): List<Track> {
-        return mcwsClient.searchFiles(query, limit = limit).fold(
-            onSuccess = { it },
-            onFailure = { 
-                logger.e { "Failed to search for '$query': ${it.message}" }
-                emptyList() 
-            }
-        )
+        logger.d { "Library search routed to MCWS queryLength=${query.length}, limit=$limit" }
+        return mcwsService.search(query, limit)
+    }
+
+    private fun activeZoneOrLog(command: String): String? {
+        val zoneId = _activeZoneId.value
+        if (zoneId == null) {
+            logger.w { "Ignoring command $command because no active zone is selected" }
+        }
+        return zoneId
+    }
+
+    private fun remoteZoneOrLog(command: String): String? {
+        val zoneId = activeZoneOrLog(command) ?: return null
+        if (zoneId == LocalAudioService.LOCAL_ZONE_ID) {
+            logger.d { "Ignoring MCWS-only command $command while local zone is active" }
+            return null
+        }
+        return zoneId
+    }
+
+    private fun backendName(zoneId: String): String {
+        return if (zoneId == LocalAudioService.LOCAL_ZONE_ID) "local" else "MCWS"
     }
 }

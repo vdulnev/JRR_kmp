@@ -29,6 +29,8 @@ Resolution: authenticated server details and token are now persisted in one Data
 
 ### High: `JRiverService.start()` is not idempotent
 
+Status: fixed after review.
+
 File:
 
 - `composeApp/src/commonMain/kotlin/com/example/jrr/service/JRiverService.kt`
@@ -37,7 +39,7 @@ File:
 
 Impact: re-login, token refresh, or repeated startup can accumulate collectors and duplicate local status updates.
 
-Suggested fix: track collector jobs and cancel them, or make `start()` return early when the service is already running.
+Resolution: `JRiverService` is now a coordinator over two backend services. `McwsService` owns remote zones, MCWS playback polling, remote queue state, library browsing, and remote commands. `LocalAudioService` owns local player observation and local playback commands. This keeps remote polling and local observers in separate lifecycles while preserving the existing UI-facing `JRiverService` API.
 
 ### Medium: local `next()` and `previous()` route to MCWS
 

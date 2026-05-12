@@ -34,7 +34,7 @@ fun App() {
         logger.i { "LaunchedEffect - serverAddress: $serverAddress, token: ${authToken?.take(5)}..." }
         if (!serverAddress.isNullOrBlank()) {
             logger.d { "Configuring client and starting service with $serverAddress" }
-            mcwsClient.updateConfig(serverAddress!!, authToken)
+            mcwsClient.updateConfig(serverAddress, authToken)
             jRiverService.start()
             currentScreen = Screen.Player
         } else {

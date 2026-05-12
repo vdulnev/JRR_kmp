@@ -58,6 +58,7 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.serialization.kotlinx.xml)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.serialization.json.io)
             implementation(libs.xmlutil.serialization)
 
             // Persistence

@@ -5,8 +5,15 @@ import com.example.jrr.domain.model.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import io.ktor.utils.io.readBuffer
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.io.decodeFromSource
 import nl.adaptivity.xmlutil.serialization.XML
 import org.koin.core.annotation.Single
 import kotlin.random.Random
@@ -365,12 +372,7 @@ class JRiverMcwsClient(
     }
 
     suspend fun browseFiles(id: String): Result<List<Track>> = runCatching {
-        val params = mapOf(
-            "ID" to id,
-            "Action" to "JSON"
-        )
-        val responseJson = api.get(baseUrl, "Browse/Files", params, token)
-        parseTrackList(responseJson)
+        streamTracks("Browse/Files", mapOf("ID" to id, "Action" to "JSON"))
     }
 
     suspend fun searchFiles(query: String, fields: String = "Calculated", limit: Int = -1): Result<List<Track>> = runCatching {
@@ -380,58 +382,70 @@ class JRiverMcwsClient(
             "Fields" to fields
         )
         if (limit > 0) params["Limit"] = limit.toString()
-        
-        val responseJson = api.get(baseUrl, "Files/Search", params, token)
-        parseTrackList(responseJson)
+        streamTracks("Files/Search", params)
     }
 
-    private fun parseTrackList(responseJson: String): List<Track> {
-        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; isLenient = true }
-        val jsonElement = json.parseToJsonElement(responseJson)
-        
-        val itemsArray = when {
-            jsonElement is kotlinx.serialization.json.JsonArray -> jsonElement
-            jsonElement is kotlinx.serialization.json.JsonObject -> {
-                val response = jsonElement["Response"] as? kotlinx.serialization.json.JsonObject
-                val target = response ?: jsonElement
-                target["Item"] as? kotlinx.serialization.json.JsonArray
-            }
-            else -> null
-        } ?: return emptyList()
-
-        return itemsArray.map { element ->
-            val obj = element as kotlinx.serialization.json.JsonObject
-            fun getString(key: String): String {
-                val foundKey = obj.keys.find { it.equals(key, ignoreCase = true) }
-                return foundKey?.let { k ->
-                    val el = obj[k]
-                    if (el is kotlinx.serialization.json.JsonPrimitive) el.content else el.toString()
-                } ?: ""
-            }
-            fun getInt(key: String): Int = getString(key).toIntOrNull() ?: 0
-
-            Track(
-                fileKey = getInt("Key"),
-                name = getString("Name"),
-                artist = getString("Artist"),
-                album = getString("Album"),
-                albumArtist = getString("Album Artist"),
-                albumArtistAuto = getString("Album Artist (auto)"),
-                genre = getString("Genre"),
-                duration = getString("Duration").toDoubleOrNull() ?: 0.0,
-                trackNumber = getInt("Track #"),
-                discNumber = getInt("Disc #"),
-                totalDiscs = getInt("Total Discs"),
-                totalTracks = getInt("Total Tracks"),
-                imageUrl = getString("Image File"),
-                bitrate = getInt("Bitrate"),
-                bitDepth = getInt("Bit Depth"),
-                sampleRate = getInt("Sample Rate"),
-                channels = getInt("Channels"),
-                fileType = getString("File Type"),
-                filePath = getString("Filename"),
-                dateReadable = getString("Date (readable)")
-            )
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun streamTracks(endpoint: String, params: Map<String, String>): List<Track> {
+        val url = "$baseUrl/MCWS/v1/$endpoint"
+        val response = httpClient.get(url) {
+            params.forEach { (k, v) -> parameter(k, v) }
+            token?.let { parameter("Token", it) }
         }
+        if (!response.status.isSuccess()) {
+            throw Exception("MCWS request failed: ${response.status}")
+        }
+        val source = response.bodyAsChannel().readBuffer()
+        val dtos = trackJson.decodeFromSource<List<TrackDto>>(source)
+        return dtos.map { it.toTrack() }
     }
 }
+
+private val trackJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+@Serializable
+private data class TrackDto(
+    @SerialName("Key") val key: String = "",
+    @SerialName("Name") val name: String = "",
+    @SerialName("Artist") val artist: String = "",
+    @SerialName("Album") val album: String = "",
+    @SerialName("Album Artist") val albumArtist: String = "",
+    @SerialName("Album Artist (auto)") val albumArtistAuto: String = "",
+    @SerialName("Genre") val genre: String = "",
+    @SerialName("Duration") val duration: String = "",
+    @SerialName("Track #") val trackNumber: String = "",
+    @SerialName("Disc #") val discNumber: String = "",
+    @SerialName("Total Discs") val totalDiscs: String = "",
+    @SerialName("Total Tracks") val totalTracks: String = "",
+    @SerialName("Image File") val imageUrl: String = "",
+    @SerialName("Bitrate") val bitrate: String = "",
+    @SerialName("Bit Depth") val bitDepth: String = "",
+    @SerialName("Sample Rate") val sampleRate: String = "",
+    @SerialName("Channels") val channels: String = "",
+    @SerialName("File Type") val fileType: String = "",
+    @SerialName("Filename") val filePath: String = "",
+    @SerialName("Date (readable)") val dateReadable: String = "",
+)
+
+private fun TrackDto.toTrack(): Track = Track(
+    fileKey = key.toIntOrNull() ?: 0,
+    name = name,
+    artist = artist,
+    album = album,
+    albumArtist = albumArtist,
+    albumArtistAuto = albumArtistAuto,
+    genre = genre,
+    duration = duration.toDoubleOrNull() ?: 0.0,
+    trackNumber = trackNumber.toIntOrNull() ?: 0,
+    discNumber = discNumber.toIntOrNull() ?: 0,
+    totalDiscs = totalDiscs.toIntOrNull() ?: 0,
+    totalTracks = totalTracks.toIntOrNull() ?: 0,
+    imageUrl = imageUrl,
+    bitrate = bitrate.toIntOrNull() ?: 0,
+    bitDepth = bitDepth.toIntOrNull() ?: 0,
+    sampleRate = sampleRate.toIntOrNull() ?: 0,
+    channels = channels.toIntOrNull() ?: 0,
+    fileType = fileType,
+    filePath = filePath,
+    dateReadable = dateReadable,
+)
